@@ -7,17 +7,17 @@ const auth_user = async (req, res) => { }
 const create_user = async (req, res) => {
     try {
         let { name, email, password } = req.body
-
+        console.log(req.body)
 
         const salt = await bcrypt.genSalt(10)
         let hash_password = await bcrypt.hash(password, salt)
 
-        let new_user = await users.create({ name, email, hash_password })
+        let new_user = await users.create({ name, email, password: hash_password })
         if (new_user._id) {
             res.json({ user_created: true })
         }
         else {
-            res.json({ user_created: false, error: 'Something went Wrong!' })
+            res.json({ user_created: false, error: 'Something went Wron!' })
         }
     } catch (error) {
         console.log(error)

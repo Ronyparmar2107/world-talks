@@ -1,7 +1,10 @@
 'use client'
 import React from 'react'
+import { Button } from '@mui/material'
 import { useState } from 'react'
 import styles from '../Login/Login.module.css'
+import { useDispatch, useSelector } from 'react-redux'
+import { createUser } from '@/Redux-Toolkit/Slices/userSlice'
 
 const Signup = () => {
     const [signupForm, setSignupForm] = useState({
@@ -13,13 +16,27 @@ const Signup = () => {
         confirm_password: ''
     })
 
+    const dispatch = useDispatch()
 
+    const { isLoading } = useSelector(state => state.user)
+    // const isLoading = true
     const submit_handler = () => {
-        if (signupForm.confirm_email === signupForm.email) {
-            if (signupForm.password === signupForm.confirm_password) console.log("Account Created")
-            else alert("Match both the password fields")
+
+        if (Object.values(signupForm).every(v => v != '')) {
+            if (signupForm.confirm_email === signupForm.email) {
+                if (signupForm.password === signupForm.confirm_password) {
+                    let data = {
+                        name: signupForm.first_name + " " + signupForm.last_name,
+                        email: signupForm.email,
+                        password: signupForm.password
+                    }
+                    dispatch(createUser(data))
+                }
+                else alert("Match both the password fields")
+            }
+            else alert("Match both the email fields")
         }
-        else alert("Match both the email fields")
+        else alert("Please Fill all the details in form")
 
     }
 
@@ -52,9 +69,23 @@ const Signup = () => {
                     <label>Confirm Password</label>
                     <input value={signupForm.confirm_password} onChange={(e) => { setSignupForm({ ...signupForm, confirm_password: e.target.value }) }} type='password' />
                 </div>
-                <button className={styles.login_button} onClick={submit_handler}>Sign Up</button>
+
+
+                <Button className={styles.login_button} onClick={submit_handler} loading={isLoading} variant="contained"
+                    style={{
+                        margin: '1rem 0',
+                        background: 'blue',
+                        borderRadius: '10px',
+                        // color: 'white',
+                        border: 'none',
+                        fontSize: '12px',
+                        padding: '8px 20px',
+                        cursor: 'pointer'
+                    }}>Submit</Button>
+
+
             </div>
-        </div>
+        </div >
     )
 }
 

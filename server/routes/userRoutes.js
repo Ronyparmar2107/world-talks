@@ -11,3 +11,6 @@ router.post("/getuser", fetchuser, get_user)
 router.post("/getusers", fetchuser, get_users)
 router.put("/deleteuser", fetchuser, delete_user)
 router.put("/updateuser", fetchuser, update_user)
+
+
+module.exports = router
