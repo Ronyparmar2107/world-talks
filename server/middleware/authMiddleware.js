@@ -1,17 +1,23 @@
 const jwt = require('jsonwebtoken')
 
 const fetchuser = (req, res, next) => {
-    let token = req.header('auth-token')
+    let token = req.header('auth_token')
+    // console.log(token)
     if (!token) {
-        res.status(401).send({ 'error': 'Not an authenicate user' })
+        res.status(401).send({ 'error': 'Not an authenticated user' })
     }
-    try {
-        let data = jwt.verify(token, process.env.JWT_SECRET)
-        // console.log(data)
-        req.user = data.user
-        next()
-    } catch (error) {
-        res.status(401).send({ 'error': 'Not an authenicate user' })
+    else {
+
+        try {
+
+            let data = jwt.verify(token, process.env.JWT_SECRET)
+            // console.log(data)
+            req.data = data
+            next()
+        } catch (error) {
+            console.log("Maybe here")
+            res.status(401).send({ 'error': 'Not an authenticated user' })
+        }
     }
 }
 

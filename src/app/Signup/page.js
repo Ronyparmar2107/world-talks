@@ -4,9 +4,11 @@ import { Button } from '@mui/material'
 import { useState } from 'react'
 import styles from '../Login/Login.module.css'
 import { useDispatch, useSelector } from 'react-redux'
-import { createUser } from '@/Redux-Toolkit/Slices/userSlice'
+import { createUser, notificationHandler } from '@/Redux-Toolkit/Slices/userSlice'
+import { useRouter } from 'next/navigation'
 
 const Signup = () => {
+    const { isLoading } = useSelector(state => state.user)
     const [signupForm, setSignupForm] = useState({
         first_name: '',
         last_name: '',
@@ -17,10 +19,10 @@ const Signup = () => {
     })
 
     const dispatch = useDispatch()
+    const router = useRouter()
 
-    const { isLoading } = useSelector(state => state.user)
     // const isLoading = true
-    const submit_handler = () => {
+    const submit_handler = async () => {
 
         if (Object.values(signupForm).every(v => v != '')) {
             if (signupForm.confirm_email === signupForm.email) {
@@ -30,13 +32,18 @@ const Signup = () => {
                         email: signupForm.email,
                         password: signupForm.password
                     }
-                    dispatch(createUser(data))
+                    let result = await dispatch(createUser(data))
+
+                    if (result.meta.requestStatus === "fulfilled") {
+                        dispatch(notificationHandler("Account Created. Now Login & Start Chatting."))
+                        router.push("/")
+                    }
                 }
-                else alert("Match both the password fields")
+                else dispatch(notificationHandler("Match both the password fields"))
             }
-            else alert("Match both the email fields")
+            else dispatch(notificationHandler("Match both the email fields"))
         }
-        else alert("Please Fill all the details in form")
+        else dispatch(notificationHandler("Please Fill all the details in form"))
 
     }
 

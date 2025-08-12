@@ -1,15 +1,26 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import styles from './Home.module.css'
 import Image from 'next/image'
 import friends_list from '../../dummy_data/friends_list'
 import conversations from '@/dummy_data/conversations'
+import { useDispatch, useSelector } from 'react-redux'
+import { fetchuser } from '@/Redux-Toolkit/Slices/userSlice'
+import { IconButton } from '@mui/material'
+import AddIcon from '@mui/icons-material/Add';
 
 const Home = () => {
-    const [userId, setUserId] = useState(0)
+    let { token, user } = useSelector(state => state.user)
     const [openChatId, setOpenChatId] = useState()
     const [conversation, setConversation] = useState()
 
+    const dispatch = useDispatch()
+
+    useEffect(() => {
+        dispatch(fetchuser(token))
+    }, [dispatch])
+
+    console.log(user)
     const openChat = (friend_id, conversation_id) => {
         setOpenChatId(friend_id)
         setConversation(conversations.find(ele => ele.id === conversation_id))
@@ -51,42 +62,48 @@ const Home = () => {
             <div className={styles.home_side_container}>
                 <div className={styles.options_container}>
                     <div className={styles.friends_number}>
-                        <h1>10</h1>
+                        <div>10</div>
                         <p>Requests</p>
                     </div>
                     <div className={styles.friend_request}>
-                        <h1>{friends_list.length}</h1>
+                        <div>{user.friends_list.length}</div>
                         <p>Friends</p>
                     </div>
                     <div className={styles.account}>
                         <div className={styles.profile_photo}>
                             <Image
                                 src="/profile.png"
-                                height={35}
-                                width={35}
+                                height={30}
+                                width={30}
                                 alt="Picture of the author"
                             />
                         </div>
+                        <p>{user?.name}</p>
                     </div>
                 </div>
                 <div className={styles.chat_list_container}>
                     {
-                        friends_list.map((friend) => {
-                            return (
-                                <div key={friend.id} className={styles.chat_item + " " + (openChatId === friend.id ? styles.current_chat_item : "")} onClick={() => openChat(friend.id, friend.conversationId)}>
-                                    <Image
-                                        src="/profile.png"
-                                        height={10}
-                                        width={10}
-                                        alt="Picture of the author"
-                                    />
-                                    <div className={styles.chat_item_details_container}>
-                                        <h6>{friend.name}</h6>
-                                        <p>You have a new message.</p>
+                        user.friends_list.length === 0 ?
+                            <div style={{ display: "flex", alignItems: "center" }}> Add Friends <IconButton aria-label="delete">
+                                <AddIcon style={{ "color": 'white' }} />
+                            </IconButton> </div>
+                            :
+                            user.friends_list.map((friend) => {
+                                return (
+                                    <div key={friend.id} className={styles.chat_item + " " + (openChatId === friend.id ? styles.current_chat_item : "")} onClick={() => openChat(friend.id, friend.conversationId)}>
+                                        <Image
+                                            src="/profile.png"
+                                            height={10}
+                                            width={10}
+                                            alt="Picture of the author"
+                                        />
+                                        <div className={styles.chat_item_details_container}>
+                                            <h6>{friend.name}</h6>
+                                            <p>You have a new message.</p>
+                                        </div>
                                     </div>
-                                </div>
-                            )
-                        })
+                                )
+                            })
                     }
                 </div>
             </div>
