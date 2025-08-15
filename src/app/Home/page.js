@@ -4,20 +4,65 @@ import styles from './Home.module.css'
 import Image from 'next/image'
 import friends_list from '../../dummy_data/friends_list'
 import conversations from '@/dummy_data/conversations'
+import api from "../../api/api"
+
 import { useDispatch, useSelector } from 'react-redux'
-import { fetchuser } from '@/Redux-Toolkit/Slices/userSlice'
-import { IconButton } from '@mui/material'
+import { fetchUser, logoutHandler, notificationHandler, sendRequest } from '@/Redux-Toolkit/Slices/userSlice'
+import {
+    IconButton,
+    TextField,
+    Dialog,
+    DialogTitle,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    Typography,
+    Button,
+    Menu,
+    MenuItem,
+    styled,
+    List,
+    ListItem,
+    ListItemText,
+    Box
+} from '@mui/material'
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+// import { styled } from '@mui/material/styles';
+// import TextField from '@mui/material/TextField';
+// import Dialog from '@mui/material/Dialog';
+// import DialogTitle from '@mui/material/DialogTitle';
+// import DialogActions from '@mui/material/DialogActions';
+// import DialogContent from '@mui/material/DialogContent';
+// import DialogContentText from '@mui/material/DialogContentText';
+// import Typography from '@mui/material/Typography';
+// import Button from '@mui/material/Button'
+// import Menu from '@mui/material/Menu';
+// import MenuItem from '@mui/material/MenuItem';
+
+const BootstrapDialog = styled(Dialog)(({ theme }) => ({
+    '& .MuiDialogContent-root': {
+        padding: theme.spacing(2),
+    },
+    '& .MuiDialogActions-root': {
+        padding: theme.spacing(1),
+    },
+}));
 
 const Home = () => {
     let { token, user } = useSelector(state => state.user)
+    const [open, setOpen] = useState(false)
+    const [addFriendLoading, setAddFriendLoading] = useState(false)
+    const [openProfileMenu, setOpenProfileMenu] = useState(false)
+    const [openRequestBox, setOpenRequestBox] = useState(false)
     const [openChatId, setOpenChatId] = useState()
     const [conversation, setConversation] = useState()
+    const [addFriend, setAddFriend] = useState()
 
     const dispatch = useDispatch()
 
     useEffect(() => {
-        dispatch(fetchuser(token))
+        dispatch(fetchUser(token))
     }, [dispatch])
 
     console.log(user)
@@ -43,33 +88,171 @@ const Home = () => {
             else return dateLable
         }
     }
-    const makeDate = (date) => {
-        const newDate = new Date(date)
-        const dd = newDate.getDate().toString();
-        const mm = String(newDate.getMonth() + 1).padStart(2, '0'); // January is 0
-        const yyyy = newDate.getFullYear();
-        console.log(dd, mm, yyyy)
-        return `${dd}/${mm}/${yyyy}`
-    }
-    const today = new Date();
-    const tdd = String(today.getDate()).padStart(2, '0');
-    const tmm = String(today.getMonth() + 1).padStart(2, '0'); // January is 0
-    const tyyyy = today.getFullYear();
 
-    const formattedDate = `${tdd}/${tmm}/${tyyyy}`;
+    // const makeDate = (date) => {
+    //     const newDate = new Date(date)
+    //     const dd = newDate.getDate().toString();
+    //     const mm = String(newDate.getMonth() + 1).padStart(2, '0'); // January is 0
+    //     const yyyy = newDate.getFullYear();
+    //     console.log(dd, mm, yyyy)
+    //     return `${dd}/${mm}/${yyyy}`
+    // }
+    // const today = new Date();
+    // const tdd = String(today.getDate()).padStart(2, '0');
+    // const tmm = String(today.getMonth() + 1).padStart(2, '0'); // January is 0
+    // const tyyyy = today.getFullYear();
+
+    // const formattedDate = `${tdd}/${tmm}/${tyyyy}`;
+
+    const addFriendHandler = async () => {
+        setAddFriendLoading(true)
+        try {
+            console.log(token)
+            let response = await api.post('user/sendrequest',
+                { email: addFriend },
+                {
+                    headers: {
+                        "auth_token": token
+                    }
+                })
+            if (response.data.status) {
+                // console.log(response)
+                dispatch(notificationHandler(response.data.message))
+            } else {
+
+            }
+        } catch (error) {
+            console.log(error)
+            dispatch(notificationHandler("Something went wrong."))
+        }
+        // dispatch(sendRequest(addFriend, token))
+        setOpen(false)
+        setAddFriendLoading(false)
+    }
+
+    const manageRequest = async (request_id, is_approved) => {
+
+        // console.log("In Here")
+        try {
+            let response = await api.post("user/managerequest", {
+                request_id, is_approved
+            }, {
+                headers: {
+                    "auth_token": token
+                }
+            })
+            console.log(response)
+            if (response.data.status) {
+                dispatch(notificationHandler(response.data.message))
+            }
+        } catch (error) {
+            console.log(error)
+            dispatch(notificationHandler("Something went wrong!!"))
+        }
+    }
     return (
         <div className={styles.home_main_container}>
+            <Dialog open={open} onClose={() => setOpen(false)}>
+                <DialogContent>
+                    <DialogContentText>
+                        Enter the email address of your friend.
+                    </DialogContentText>
+                    <form id="add-friend-form">
+                        <TextField
+                            autoFocus
+                            required
+                            margin="dense"
+                            id="name"
+                            name="email"
+                            label="Email Address"
+                            type="email"
+                            fullWidth
+                            variant="standard"
+                            onChange={(e) => setAddFriend(e.target.value)}
+                        />
+                    </form>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpen(false)}>Cancel</Button>
+                    <Button form="add-friend-form" onClick={addFriendHandler} disabled={addFriendLoading}>
+                        {addFriendLoading ? "Sending Request" : "Add Friend"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
             <div className={styles.home_side_container}>
                 <div className={styles.options_container}>
-                    <div className={styles.friends_number}>
-                        <div>10</div>
+                    <Button className={styles.friends_number} onClick={() => setOpenRequestBox(true)}>
+                        <div>{user?.requests?.filter(ele => ele.is_active === true)?.length}</div>
                         <p>Requests</p>
-                    </div>
-                    <div className={styles.friend_request}>
-                        <div>{user.friends_list.length}</div>
+                    </Button>
+                    <BootstrapDialog
+                        sx={{ '& .MuiDialog-paper': { width: '80%', maxHeight: 435 } }}
+                        onClose={() => setOpenRequestBox(false)}
+                        aria-labelledby="customized-dialog-title"
+                        open={openRequestBox}
+                    >
+                        <DialogTitle sx={{ m: 0, p: 2 }} id="customized-dialog-title">
+                            Pending Requests
+                        </DialogTitle>
+                        <IconButton
+                            aria-label="close"
+                            onClick={() => setOpenRequestBox(false)}
+                            sx={(theme) => ({
+                                position: 'absolute',
+                                right: 8,
+                                top: 8,
+                                color: theme.palette.grey[500],
+                            })}
+                        >
+                            <CloseIcon />
+                        </IconButton>
+                        <DialogContent dividers >
+                            {user?.requests?.length === 0 || null ? "No requests" : <List>
+                                {user?.requests?.map((request) => (
+                                    request.is_active && <ListItem
+                                        key={request.from._id}
+                                        divider
+                                        sx={{ display: "flex", justifyContent: "space-between" }}
+                                    >
+                                        {/* Friend Name */}
+                                        <ListItemText primary={request.from.name} />
+
+                                        {/* Action Buttons */}
+                                        <Box>
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                size="small"
+                                                sx={{ mr: 1 }}
+                                                onClick={() => manageRequest(request._id, true)}
+                                            >
+                                                Accept
+                                            </Button>
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                size="small"
+                                                onClick={() => manageRequest(request._id, false)}
+                                            >
+                                                Reject
+                                            </Button>
+                                        </Box>
+                                    </ListItem>
+                                ))}
+                            </List>}
+                        </DialogContent>
+                    </BootstrapDialog>
+                    <Button className={styles.friend_request}>
+                        <div>{user?.friends_list?.length}</div>
                         <p>Friends</p>
-                    </div>
-                    <div className={styles.account}>
+                    </Button>
+                    <Button className={styles.account}
+                        id="basic-button"
+                        aria-controls={openProfileMenu ? 'basic-menu' : undefined}
+                        aria-haspopup="true"
+                        aria-expanded={openProfileMenu ? 'true' : undefined}
+                        onClick={(event) => setOpenProfileMenu(event.currentTarget)}>
+
                         <div className={styles.profile_photo}>
                             <Image
                                 src="/profile.png"
@@ -79,16 +262,34 @@ const Home = () => {
                             />
                         </div>
                         <p>{user?.name}</p>
-                    </div>
+                    </Button>
+                    <Menu
+                        id="basic-menu"
+                        anchorEl={openProfileMenu}
+                        open={openProfileMenu}
+                        onClose={() => setOpenProfileMenu(null)}
+                        slotProps={{
+                            list: {
+                                'aria-labelledby': 'basic-button',
+                            },
+                        }}
+                    >
+                        <MenuItem onClick={() => setOpenProfileMenu(null)}>Profile</MenuItem>
+                        <MenuItem onClick={() => setOpenProfileMenu(null)}>My account</MenuItem>
+                        <MenuItem onClick={() => {
+                            setOpenProfileMenu(null)
+                            dispatch(logoutHandler())
+                        }}>Logout</MenuItem>
+                    </Menu>
                 </div>
                 <div className={styles.chat_list_container}>
                     {
-                        user.friends_list.length === 0 ?
-                            <div style={{ display: "flex", alignItems: "center" }}> Add Friends <IconButton aria-label="delete">
+                        user?.friends_list?.length === 0 || null ?
+                            <div style={{ display: "flex", alignItems: "center" }}> Add Friends <IconButton aria-label="delete" onClick={() => setOpen(true)}>
                                 <AddIcon style={{ "color": 'white' }} />
                             </IconButton> </div>
                             :
-                            user.friends_list.map((friend) => {
+                            user?.friends_list?.map((friend) => {
                                 return (
                                     <div key={friend.id} className={styles.chat_item + " " + (openChatId === friend.id ? styles.current_chat_item : "")} onClick={() => openChat(friend.id, friend.conversationId)}>
                                         <Image

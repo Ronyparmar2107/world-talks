@@ -39,7 +39,7 @@ export const loginUser = createAsyncThunk(
     }
 )
 
-export const fetchuser = createAsyncThunk(
+export const fetchUser = createAsyncThunk(
     'user/fetchUser',
     async (data, { rejectWithValue }) => {
         try {
@@ -55,12 +55,39 @@ export const fetchuser = createAsyncThunk(
         }
     }
 )
+
+// export const sendRequest = createAsyncThunk(
+//     "user/sendRequest",
+//     async (data, { rejectWithValue }) => {
+//         try {
+//             const response = await api.post('user/sendrequest',
+//                 { email: data.email },
+//                 {
+//                     headers: {
+//                         "auth_token": data.token
+//                     }
+//                 }
+//             )
+//             return response.data
+//         } catch (error) {
+//             return rejectWithValue(error.response?.data || error.message)
+//         }
+//     }
+// )
 const userSlice = createSlice({
     name: "userSlice",
     initialState,
     reducers: {
         notificationHandler: (state, action) => {
             state.notification = action.payload
+            state.notification_toggle = !state.notification_toggle
+        },
+        logoutHandler: (state, action) => {
+            state.isLogin = false
+            state.token = null
+            state.user = null
+            localStorage.clear()
+            state.notification = "Logout Successfully"
             state.notification_toggle = !state.notification_toggle
         }
     },
@@ -78,7 +105,7 @@ const userSlice = createSlice({
             .addCase(loginUser.fulfilled, (state, action) => {
                 let data = action.payload
                 console.log(data)
-                if (data.auth_user) {
+                if (data.status) {
                     state.isLogin = true
                     state.token = data.token
                     localStorage.setItem("token", data.token)
@@ -92,12 +119,12 @@ const userSlice = createSlice({
                 state.isLoading = false
                 notificationHandler('Server not reachable.')
             })
-            .addCase(fetchuser.pending, (state) => {
+            .addCase(fetchUser.pending, (state) => {
                 state.isLoading = true
             })
-            .addCase(fetchuser.fulfilled, (state, action) => {
+            .addCase(fetchUser.fulfilled, (state, action) => {
                 let data = action.payload
-                if (data.fetch_user) {
+                if (data.status) {
                     state.user = data.user
                     if (!state.token) {
                         state.token = localStorage.getItem("token")
@@ -109,11 +136,20 @@ const userSlice = createSlice({
                 }
                 state.isLoading = false
             })
-            .addCase(fetchuser.rejected, state => {
+            .addCase(fetchUser.rejected, state => {
                 state.isLoading = false
             })
+        // .addCase(sendRequest.rejected, state => state.isLoading = false)
+        // .addCase(sendRequest.fulfilled, (state, action) => {
+        //     let data = action.payload
+        //     if (data.status) {
+        //         notificationHandler(data.message)
+        //     }
+        //     state.isLoading = false
+        // })
+        // .addCase(sendRequest.pending, state => state.isLoading = true)
     }
 })
 
-export const { notificationHandler } = userSlice.actions
+export const { notificationHandler, logoutHandler } = userSlice.actions
 export default userSlice.reducer

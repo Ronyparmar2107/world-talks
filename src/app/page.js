@@ -4,7 +4,7 @@ import Login from "./Login/page";
 import { useDispatch, useSelector } from "react-redux";
 import Chat from "./Home/page"
 import { Snackbar } from "@mui/material";
-import { fetchuser, notificationHandler } from "@/Redux-Toolkit/Slices/userSlice";
+import { fetchUser, notificationHandler } from "@/Redux-Toolkit/Slices/userSlice";
 import { useEffect } from "react";
 
 export default function Home() {
@@ -12,8 +12,9 @@ export default function Home() {
   const dispatch = useDispatch()
   useEffect(() => {
     let token = localStorage.getItem("token")
+    console.log(token)
     if (token) {
-      dispatch(fetchuser(token))
+      dispatch(fetchUser(token))
     }
   }, [dispatch])
 

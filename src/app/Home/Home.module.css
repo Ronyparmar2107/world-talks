@@ -30,20 +30,22 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    color: white !important;
 }
 
 .friends_number div,
 .friend_request div,
 .account div {
-    font-size: 20px;
-    margin-bottom: auto;
-    font-weight: bold;
+    font-size: 20px !important;
+    margin-bottom: auto !important;
+    font-weight: normal !important;
     height: 5vh;
 }
 
 .friends_number p,
 .friend_request p {
-    font-size: 10px;
+    font-size: 10px !important;
+    color: white !important;
 }
 
 .profile_photo,
@@ -51,7 +53,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    font-size: 10px;
+    font-size: 10px !important;
+    color: white !important;
+    font-weight: normal !important;
 }
 
 .profile_photo img {
