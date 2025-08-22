@@ -1,5 +1,6 @@
 'use client'
 import api from "@/api/api";
+import { init_socket } from "@/utils/socket";
 // import axios from "axios";
 // import { headers } from "next/headers";
 
@@ -109,6 +110,7 @@ const userSlice = createSlice({
                     state.isLogin = true
                     state.token = data.token
                     localStorage.setItem("token", data.token)
+                    init_socket(data.token)
                 }
                 else {
                     notificationHandler(data.error)

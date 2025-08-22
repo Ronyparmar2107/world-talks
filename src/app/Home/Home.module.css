@@ -81,6 +81,7 @@
     border-radius: 15px;
     display: flex;
     margin: 5px 0;
+    cursor: pointer;
 }
 
 .current_chat_item {
@@ -216,7 +217,7 @@
     display: none;
 }
 
-.chat_input_conatiner {
+.chat_input_container {
     height: 10%;
     width: 100%;
     padding: 10px;
@@ -224,7 +225,7 @@
     /* border: 2px solid yellow; */
 }
 
-.chat_input_conatiner input {
+.chat_input_container input {
     width: 90%;
     border-radius: 10px;
     height: 70%;

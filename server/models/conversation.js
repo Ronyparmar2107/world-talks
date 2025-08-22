@@ -9,6 +9,7 @@ const seenBySchema = new Schema({
     },
     seen_at: {
         type: Date,
+        default: Date.now()
     }
 })
 const receivedBySchema = new Schema({
@@ -18,6 +19,7 @@ const receivedBySchema = new Schema({
     },
     received_at: {
         type: Date,
+        default: Date.now()
     }
 })
 
@@ -50,7 +52,10 @@ const conversationSchema = new Schema({
         required: true
     }],
     messages: {
-        type: [messageSchema]
+        type: [{
+            type: Schema.Types.ObjectId,
+            ref: 'message'
+        }]
     },
     is_group: {
         type: Boolean,
@@ -63,5 +68,6 @@ const conversationSchema = new Schema({
 })
 
 const conversations = mongoose.model('conversation', conversationSchema)
+const messages = mongoose.model('message', messageSchema)
 
-module.exports = { conversations, messages: messageSchema }
+module.exports = { conversations, messages, conversationSchema }

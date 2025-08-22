@@ -64,7 +64,11 @@ const create_user = async (req, res) => {
 
 const get_user = async (req, res) => {
     try {
-        let user = await users.findById(req.data._id).select("-password").populate('requests.from', 'name email')
+        let user = await users.findById(req.data._id)
+            .select("-password")
+            .populate('requests.from', 'name email')
+            .populate("friends_list", "name email")
+            .populate("conversation_list")
         // console.log(user)
         if (!user) {
             return res.json({ status: false, error: 'Something Went Wrong' })
@@ -113,6 +117,7 @@ const manage_request = async (req, res) => {
     try {
         const { request_id, is_approved } = req.body
         // console.log(request_id, is_approved)
+
         //First Lets update its approval
         let user = await users.findById(req.data._id).populate("requests.from")
         // console.log("user", user)
@@ -136,13 +141,13 @@ const manage_request = async (req, res) => {
 
             if (conversation._id) {
                 //add as friends
-                user.friends_list.push({ id: user2._id, conversation_id: conversation._id })
+                user.friends_list.push(user2._id)
+                user.conversation_list.push(conversation._id)
                 await user.save()
-                user2.friends_list.push({ id: user._id, conversation_id: conversation._id })
+                user2.friends_list.push(user._id)
+                user2.conversation_list.push(conversation._id)
                 await user2.save()
             }
-
-
             res.json({ status: true, message: `${user2.name} was added as your friend. Start Chatting :D.` })
         }
         else {

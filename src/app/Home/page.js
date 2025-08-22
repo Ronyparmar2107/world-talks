@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import styles from './Home.module.css'
 import Image from 'next/image'
 import friends_list from '../../dummy_data/friends_list'
@@ -28,17 +28,7 @@ import {
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
-// import { styled } from '@mui/material/styles';
-// import TextField from '@mui/material/TextField';
-// import Dialog from '@mui/material/Dialog';
-// import DialogTitle from '@mui/material/DialogTitle';
-// import DialogActions from '@mui/material/DialogActions';
-// import DialogContent from '@mui/material/DialogContent';
-// import DialogContentText from '@mui/material/DialogContentText';
-// import Typography from '@mui/material/Typography';
-// import Button from '@mui/material/Button'
-// import Menu from '@mui/material/Menu';
-// import MenuItem from '@mui/material/MenuItem';
+import { get_socket } from '@/utils/socket'
 
 const BootstrapDialog = styled(Dialog)(({ theme }) => ({
     '& .MuiDialogContent-root': {
@@ -51,26 +41,38 @@ const BootstrapDialog = styled(Dialog)(({ theme }) => ({
 
 const Home = () => {
     let { token, user } = useSelector(state => state.user)
+    let socket = useRef(null)
+
     const [open, setOpen] = useState(false)
+
     const [addFriendLoading, setAddFriendLoading] = useState(false)
+
     const [openProfileMenu, setOpenProfileMenu] = useState(false)
     const [openRequestBox, setOpenRequestBox] = useState(false)
-    const [openChatId, setOpenChatId] = useState()
+
+    // const [openConversationId, setOpenConversationId] = useState()
     const [conversation, setConversation] = useState()
+
     const [addFriend, setAddFriend] = useState()
+
+    const [messageInput, setMessageInput] = useState('')
 
     const dispatch = useDispatch()
 
     useEffect(() => {
+        socket.current = get_socket()
+        // console.log(socket)
+        socket.current.on("receive_message", ({ message }) => {
+            let updated_conversation = conversation
+            updated_conversation.messages.push(message)
+            setConversation(updated_conversation)
+        })
         dispatch(fetchUser(token))
     }, [dispatch])
 
-    console.log(user)
-    const openChat = (friend_id, conversation_id) => {
-        setOpenChatId(friend_id)
-        setConversation(conversations.find(ele => ele.id === conversation_id))
-    }
+    // console.log(user)
 
+    // Still Need to work on it
     const addDateLable = (messages, index) => {
 
         let dateLable = < div className={styles.chat_date_container}>
@@ -89,21 +91,7 @@ const Home = () => {
         }
     }
 
-    // const makeDate = (date) => {
-    //     const newDate = new Date(date)
-    //     const dd = newDate.getDate().toString();
-    //     const mm = String(newDate.getMonth() + 1).padStart(2, '0'); // January is 0
-    //     const yyyy = newDate.getFullYear();
-    //     console.log(dd, mm, yyyy)
-    //     return `${dd}/${mm}/${yyyy}`
-    // }
-    // const today = new Date();
-    // const tdd = String(today.getDate()).padStart(2, '0');
-    // const tmm = String(today.getMonth() + 1).padStart(2, '0'); // January is 0
-    // const tyyyy = today.getFullYear();
-
-    // const formattedDate = `${tdd}/${tmm}/${tyyyy}`;
-
+    // Adding a friend
     const addFriendHandler = async () => {
         setAddFriendLoading(true)
         try {
@@ -130,6 +118,7 @@ const Home = () => {
         setAddFriendLoading(false)
     }
 
+    //Managing Friend Request Accept or Reject
     const manageRequest = async (request_id, is_approved) => {
 
         // console.log("In Here")
@@ -142,16 +131,47 @@ const Home = () => {
                 }
             })
             console.log(response)
-            if (response.data.status) {
-                dispatch(notificationHandler(response.data.message))
-            }
+            dispatch(fetchUser(token))
+            dispatch(notificationHandler(response.data.message))
+
         } catch (error) {
             console.log(error)
             dispatch(notificationHandler("Something went wrong!!"))
         }
     }
+
+    // Loading a chat 
+    const openChat = async (conversation_id) => {
+        setConversation({ _id: conversation_id })
+        // setConversation(conversations.find(ele => ele.id === conversation_id))
+        try {
+            let response = await api.post("conversation/getconversation", {
+                conversation_id
+            },
+                {
+                    headers: {
+                        "auth_token": token
+                    }
+                })
+            if (response.data.status) {
+                console.log(response.data.conversation)
+                setConversation(response.data.conversation)
+
+            }
+            else dispatch(notificationHandler(response.data.message))
+        } catch (error) {
+            console.log(error)
+            dispatch(notificationHandler("Something went wrong while connecting to server"))
+        }
+    }
+
+    //Send Message
+    const sendMessage = () => {
+        socket.current.emit("send_message", { conversation_id: conversation._id, message: messageInput })
+    }
     return (
         <div className={styles.home_main_container}>
+            {/* Add Friend Dialog box */}
             <Dialog open={open} onClose={() => setOpen(false)}>
                 <DialogContent>
                     <DialogContentText>
@@ -179,10 +199,12 @@ const Home = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Left Side */}
             <div className={styles.home_side_container}>
                 <div className={styles.options_container}>
                     <Button className={styles.friends_number} onClick={() => setOpenRequestBox(true)}>
-                        <div>{user?.requests?.filter(ele => ele.is_active === true)?.length}</div>
+                        <div>{user?.requests?.filter(ele => ele?.is_active === true)?.length}</div>
                         <p>Requests</p>
                     </Button>
                     <BootstrapDialog
@@ -209,7 +231,7 @@ const Home = () => {
                         <DialogContent dividers >
                             {user?.requests?.length === 0 || null ? "No requests" : <List>
                                 {user?.requests?.map((request) => (
-                                    request.is_active && <ListItem
+                                    request?.is_active && <ListItem
                                         key={request.from._id}
                                         divider
                                         sx={{ display: "flex", justifyContent: "space-between" }}
@@ -284,14 +306,26 @@ const Home = () => {
                 </div>
                 <div className={styles.chat_list_container}>
                     {
+                        // Add Friend Button
                         user?.friends_list?.length === 0 || null ?
                             <div style={{ display: "flex", alignItems: "center" }}> Add Friends <IconButton aria-label="delete" onClick={() => setOpen(true)}>
                                 <AddIcon style={{ "color": 'white' }} />
                             </IconButton> </div>
                             :
-                            user?.friends_list?.map((friend) => {
+
+                            // Listing All Conversations
+                            user?.conversation_list?.map((chat) => {
+                                console.log(chat)
+                                let chat_name
+                                if (!chat?.is_group) {
+                                    console.log("friend_list : ", user?.friends_list)
+                                    let friend = user?.friends_list?.filter(ele => ele._id === chat.participants.filter(participant_id => participant_id !== user._id)[0])[0]
+                                    console.log("friend : ", friend)
+                                    chat_name = friend?.name
+                                }
+                                else chat_name = chat.group_name
                                 return (
-                                    <div key={friend.id} className={styles.chat_item + " " + (openChatId === friend.id ? styles.current_chat_item : "")} onClick={() => openChat(friend.id, friend.conversationId)}>
+                                    <div key={chat?._id} className={styles.chat_item + " " + (conversation?._id === chat?._id ? styles.current_chat_item : "")} onClick={() => openChat(chat?._id)}>
                                         <Image
                                             src="/profile.png"
                                             height={10}
@@ -299,7 +333,7 @@ const Home = () => {
                                             alt="Picture of the author"
                                         />
                                         <div className={styles.chat_item_details_container}>
-                                            <h6>{friend.name}</h6>
+                                            <h6>{chat_name}</h6>
                                             <p>You have a new message.</p>
                                         </div>
                                     </div>
@@ -308,26 +342,28 @@ const Home = () => {
                     }
                 </div>
             </div>
+
+            {/* Right Side */}
             < div className={styles.chat_main_container}>
                 <div className={styles.chat_display_container}>
                     {
-                        conversation?.messages?.map((ele, index) => {
+                        conversation?.messages?.map((message, index) => {
                             return (
-                                <div key={index}>
+                                <div key={message?._id}>
 
                                     {addDateLable(conversation?.messages, index)}
-                                    {ele?.from !== userId ?
+                                    {message?.sender !== user._id ?
                                         <div className={styles.message_main_container + " " + styles.receiver_message}>
                                             <div className={styles.message_box}>
-                                                <div className={styles.message}>{ele?.message}</div>
-                                                <div className={styles.message_time}>{ele?.time}</div>
+                                                <div className={styles.message}>{message?.message}</div>
+                                                <div className={styles.message_time}>{message?.created}</div>
                                                 <div className={styles.message_status}>Seen</div>
                                             </div>
                                         </div> :
                                         <div className={styles.message_main_container + " " + styles.sender_message}>
                                             <div className={styles.message_box}>
-                                                <div className={styles.message}>{ele?.message}</div>
-                                                <div className={styles.message_time}>{ele?.time}</div>
+                                                <div className={styles.message}>{message?.message}</div>
+                                                <div className={styles.message_time}>{message?.time}</div>
                                                 <div className={styles.message_status}>Seen</div>
                                             </div>
                                         </div>}
@@ -336,34 +372,10 @@ const Home = () => {
                         })
                     }
 
-
-                    {/* <div className={styles.chat_date_container}>
-                        <div className={styles.chat_date}> 26/05/2025 </div>
-                    </div>
-                    <div className={styles.message_main_container + " " + styles.sender_message}>
-                        <div className={styles.message_box}>
-                            <div className={styles.message}>Hey, Good Morning!</div>
-                            <div className={styles.message_time}>11:11</div>
-                            <div className={styles.message_status}>Seen</div>
-                        </div>
-                    </div>
-
-                    <div className={styles.message_main_container + " " + styles.receiver_message}>
-                        <div className={styles.message_box}>
-                            <div className={styles.message}>Good Morning To you too</div>
-                            <div className={styles.message_time}>11:11</div>
-                            <div className={styles.message_status}>Seen</div>
-                        </div>
-                    </div> */}
-
-
-
-
-
                 </div>
-                <div className={styles.chat_input_conatiner}>
-                    <input type='text' placeholder='Write your message here...' />
-                    <button className={styles.send_button}>Send</button>
+                <div className={styles.chat_input_container}>
+                    <input type='text' value={messageInput} onChange={(e) => setMessageInput(e.target.value)} placeholder='Write your message here...' />
+                    <button className={styles.send_button} onClick={sendMessage}>Send</button>
                 </div>
             </div>
         </div >

@@ -1,16 +1,7 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+const { conversations, conversationSchema } = require("./conversation");
 const { Schema } = mongoose
-
-const friendSchema = new Schema({
-    id: {
-        type: Schema.Types.ObjectId, // Reference to another user
-        required: true
-    },
-    conversation_id: {
-        type: Schema.Types.ObjectId, // Reference to a conversation
-        required: true
-    }
-}, { _id: false }); // disable automatic _id generation for subdocs if not needed
+require("./conversation")
 
 const requestSchema = new Schema({
     from: {
@@ -54,7 +45,17 @@ const UserSchema = new Schema({
         default: false
     },
     friends_list: {
-        type: [friendSchema],
+        type: [{
+            type: Schema.Types.ObjectId,
+            ref: 'user'
+        }],
+        default: []
+    },
+    conversation_list: {
+        type: [{
+            type: Schema.Types.ObjectId,
+            ref: "conversation"
+        }],
         default: []
     },
     requests: {
@@ -68,4 +69,4 @@ const users = mongoose.model('user', UserSchema)
 // const requests = mongoose.model('request', requestSchema)
 // const friends = mongoose.model('friend', friendSchema)
 
-module.exports = { users, requests: requestSchema, friends: friendSchema }
+module.exports = { users, requests: requestSchema }

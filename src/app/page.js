@@ -6,6 +6,7 @@ import Chat from "./Home/page"
 import { Snackbar } from "@mui/material";
 import { fetchUser, notificationHandler } from "@/Redux-Toolkit/Slices/userSlice";
 import { useEffect } from "react";
+import { init_socket } from "@/utils/socket";
 
 export default function Home() {
   let { isLogin, notification, notification_toggle } = useSelector((state) => state.user)
@@ -15,6 +16,7 @@ export default function Home() {
     console.log(token)
     if (token) {
       dispatch(fetchUser(token))
+      init_socket(token)
     }
   }, [dispatch])
 
