@@ -51,7 +51,7 @@ const Home = () => {
     const [openRequestBox, setOpenRequestBox] = useState(false)
 
     // const [openConversationId, setOpenConversationId] = useState()
-    const [conversation, setConversation] = useState()
+    const [conversation, setConversation] = useState({ _id: null, messages: [] })
 
     const [addFriend, setAddFriend] = useState()
 
@@ -60,14 +60,21 @@ const Home = () => {
     const dispatch = useDispatch()
 
     useEffect(() => {
-        socket.current = get_socket()
+        if (!socket.current) {
+            socket.current = get_socket()
+        }
         // console.log(socket)
-        socket.current.on("receive_message", ({ message }) => {
-            let updated_conversation = conversation
-            updated_conversation.messages.push(message)
-            setConversation(updated_conversation)
+        socket.current.on("receive_message", (new_message) => {
+            console.log("received message", new_message)
+            updateConversation(new_message)
         })
+
+
         dispatch(fetchUser(token))
+
+        return () => {
+            socket.current.off("received_message")
+        }
     }, [dispatch])
 
     // console.log(user)
@@ -154,7 +161,7 @@ const Home = () => {
                     }
                 })
             if (response.data.status) {
-                console.log(response.data.conversation)
+                // console.log(response.data.conversation)
                 setConversation(response.data.conversation)
 
             }
@@ -168,6 +175,18 @@ const Home = () => {
     //Send Message
     const sendMessage = () => {
         socket.current.emit("send_message", { conversation_id: conversation._id, message: messageInput })
+        setMessageInput("")
+    }
+
+    //Update Chat 
+    const updateConversation = (message) => {
+        setConversation(prev => {
+            if (!prev) return prev; // don’t crash if still null
+            return {
+                ...prev,
+                messages: [...(prev.messages), message],
+            };
+        });
     }
     return (
         <div className={styles.home_main_container}>
@@ -315,12 +334,12 @@ const Home = () => {
 
                             // Listing All Conversations
                             user?.conversation_list?.map((chat) => {
-                                console.log(chat)
+                                // console.log(chat)
                                 let chat_name
                                 if (!chat?.is_group) {
-                                    console.log("friend_list : ", user?.friends_list)
+                                    // console.log("friend_list : ", user?.friends_list)
                                     let friend = user?.friends_list?.filter(ele => ele._id === chat.participants.filter(participant_id => participant_id !== user._id)[0])[0]
-                                    console.log("friend : ", friend)
+                                    // console.log("friend : ", friend)
                                     chat_name = friend?.name
                                 }
                                 else chat_name = chat.group_name

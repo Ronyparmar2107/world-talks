@@ -51,7 +51,7 @@ const Signup = () => {
         <div className={styles.login_page}>
             <div className={styles.login_main_container}>
                 <h1>World-Talks</h1>
-                <p>Let's make your account.</p>
+                <p>Let&apos;s make your account.</p>
                 <div className={styles.login_parameter}>
                     <label>First Name</label>
                     <input value={signupForm.first_name} onChange={(e) => { setSignupForm({ ...signupForm, first_name: e.target.value }) }} type='text' />

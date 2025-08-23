@@ -13,7 +13,7 @@ const seenBySchema = new Schema({
     }
 })
 const receivedBySchema = new Schema({
-    received_by: {
+    id: {
         type: Schema.Types.ObjectId,
         ref: 'user'
     },
@@ -41,8 +41,14 @@ const messageSchema = new Schema({
         type: Boolean,
         default: false
     },
-    seen_by: [seenBySchema],
-    received_by: [receivedBySchema]
+    seen_by: {
+        type: [seenBySchema],
+        default: []
+    },
+    received_by: {
+        type: [receivedBySchema],
+        default: []
+    }
 })
 
 const conversationSchema = new Schema({

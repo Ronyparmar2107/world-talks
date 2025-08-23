@@ -39,7 +39,7 @@ const init_socket = (server) => {
         if (!onlineUsersMap.has(user_id)) {
             onlineUsersMap.set(user_id, new Set())
         }
-        onlineUsersMap.get(user_id).add(socket.id)
+        onlineUsersMap.set(user_id, socket.id)
 
         //Sending a message 
         socket.on("send_message", async ({ conversation_id, message }) => {
@@ -52,17 +52,35 @@ const init_socket = (server) => {
             await new_message.save()
             conversation.messages.push(new_message._id)
             await conversation.save()
+            // console.log(conversation.participants)
+            // console.log(onlineUsersMap)
+            // console.log(user_id)
+            // conversation.participants.map(ele => {
+            //     console.log("for :", ele._id)
+            //     console.log("check user", ele._id.toString() !== user_id)
+            //     console.log("check online", onlineUsersMap.has(ele._id.toString()))
+            //     console.log("check received", !new_message.received_by.includes(e => e.id === ele._id))
+            // })
+            let recipients = conversation.participants.
+                filter(ele =>
+                    ele._id.toString() !== user_id &&
+                    onlineUsersMap.has(ele._id.toString()) &&
+                    !new_message.received_by.includes(e => e.id === ele._id))
+            // console.log(recipients)
 
-            let recipients = conversation.participants.filter(ele => ele !== user_id && onlineUsersMap.has(ele) && !new_message.received_by.has(ele))
-
+            socket.emit("receive_message", new_message)
+            //Sending back the message to sender as well to update the conversation state will proper data
             if (recipients.length > 0) {
                 recipients.map(recipient => {
-                    socket.to(recipient).emit("receive_message", {
-                        message: new_message
-                    })
+                    // console.log(recipient)
+                    let socket_id = onlineUsersMap.get(recipient._id.toString())
+                    // console.log(socket_id, new_message)
+                    socket.to(socket_id).emit("receive_message", new_message)
                     new_message.received_by.push(recipient._id)
+
                 })
             }
+            await new_message.save()
         })
     })
 }
