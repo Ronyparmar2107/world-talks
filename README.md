@@ -31,24 +31,25 @@ world-talks/
 │   ├── .env                         DB_URL, JWT_SECRET
 │   └── package.json
 │
-├── src/
-│   ├── app/
-│   │   ├── layout.js                Redux Provider + Roboto font
-│   │   ├── page.js                  Root: shows Login or Home(Chat) based on auth state; global Snackbar
-│   │   ├── Login/page.js            Login form → loginUser thunk
-│   │   ├── Signup/page.js           Signup form → createUser thunk
-│   │   └── Home/page.js             Chat UI: friends list, requests dialog, add-friend dialog, message thread
-│   ├── api/api.js                   Axios instance (NEXT_PUBLIC_BASE_URL)
-│   ├── utils/socket.js              socket.io-client init/get (JWT auth)
-│   ├── Redux-Toolkit/
-│   │   ├── Store.js
-│   │   └── Slices/userSlice.js      createUser/loginUser/fetchUser thunks, login/logout, notifications
-│   └── dummy_data/                  friends_list.js, conversations.js — leftover placeholder data
-├── public/                          favicon.ico, profile.png
-├── jsconfig.json                    @/* → ./src/*
-├── next.config.mjs
-├── .env.local                       NEXT_PUBLIC_BASE_URL, NEXT_PUBLIC_SOCKET_URL
-└── package.json                     (name: "world-talks")
+└── (Next.js app root)
+    ├── src/
+    │   ├── app/
+    │   │   ├── layout.js            Redux Provider + Roboto font
+    │   │   ├── page.js              Root: shows Login or Home(Chat) based on auth state; global Snackbar
+    │   │   ├── Login/page.js        Login form → loginUser thunk
+    │   │   ├── Signup/page.js       Signup form → createUser thunk
+    │   │   └── Home/page.js         Chat UI: friends list, requests dialog, add-friend dialog, message thread
+    │   ├── api/api.js               Axios instance (NEXT_PUBLIC_BASE_URL)
+    │   ├── utils/socket.js          socket.io-client init/get (JWT auth)
+    │   ├── Redux-Toolkit/
+    │   │   ├── Store.js
+    │   │   └── Slices/userSlice.js  createUser/loginUser/fetchUser thunks, login/logout, notifications
+    │   └── dummy_data/              friends_list.js, conversations.js — leftover placeholder data
+    ├── public/                      favicon.ico, profile.png
+    ├── jsconfig.json                @/* → ./src/*
+    ├── next.config.mjs
+    ├── .env.local                   NEXT_PUBLIC_BASE_URL, NEXT_PUBLIC_SOCKET_URL
+    └── package.json                 (name: "world-talks")
 ```
 
 ## Features implemented
@@ -106,7 +107,3 @@ NEXT_PUBLIC_SOCKET_URL=http://localhost:3001/
 ```bash
 npm run dev   # http://localhost:3000
 ```
-
-## Security note
-
-`server/.env` contains a live MongoDB URI (with password) and JWT secret in plaintext. Rotate both before pushing this repo anywhere public. `.env*` is already in `.gitignore`, so it hasn't been tracked — just make sure it stays that way.
