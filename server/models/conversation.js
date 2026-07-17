@@ -41,6 +41,10 @@ const messageSchema = new Schema({
         type: Boolean,
         default: false
     },
+    status: {
+        type: "string",
+        default: "sent"
+    },
     seen_by: {
         type: [seenBySchema],
         default: []

@@ -42,6 +42,7 @@ const BootstrapDialog = styled(Dialog)(({ theme }) => ({
 const Home = () => {
     let { token, user } = useSelector(state => state.user)
     let socket = useRef(null)
+    let chat_div = useRef(null)
 
     const [open, setOpen] = useState(false)
 
@@ -60,15 +61,17 @@ const Home = () => {
     const dispatch = useDispatch()
 
     useEffect(() => {
+        ScrollerHandler()
+    }, [conversation.messages])
+    useEffect(() => {
         if (!socket.current) {
             socket.current = get_socket()
         }
         // console.log(socket)
         socket.current.on("receive_message", (new_message) => {
-            console.log("received message", new_message)
+            // console.log("received message", new_message)
             updateConversation(new_message)
         })
-
 
         dispatch(fetchUser(token))
 
@@ -81,10 +84,14 @@ const Home = () => {
 
     // Still Need to work on it
     const addDateLable = (messages, index) => {
+        let current_date = new Date(messages[index]?.created_date)
+        let current_day = current_date.getDay()
+        let current_month = current_date.getMonth()
+        let current_year = current_date.getFullYear()
 
         let dateLable = < div className={styles.chat_date_container}>
             <div className={styles.chat_date}>
-                {messages[index]?.date}
+                {`${current_day} / ${current_month} / ${current_year}`}
             </div>
         </div >
 
@@ -92,8 +99,12 @@ const Home = () => {
             return dateLable
         }
         else {
+            let previous_date = new Date(messages[index - 1]?.created_date)
+            let previous_day = previous_date.getDay()
+            let previous_month = previous_date.getMonth()
+            let previous_year = previous_date.getFullYear()
             let prev_element = messages[index - 1]
-            if (prev_element.date === messages[index].date) return <></>
+            if (previous_day === current_day && previous_month === current_month && previous_year === current_year) return <></>
             else return dateLable
         }
     }
@@ -150,6 +161,7 @@ const Home = () => {
     // Loading a chat 
     const openChat = async (conversation_id) => {
         setConversation({ _id: conversation_id })
+        // console.log(conversation_id)
         // setConversation(conversations.find(ele => ele.id === conversation_id))
         try {
             let response = await api.post("conversation/getconversation", {
@@ -163,7 +175,12 @@ const Home = () => {
             if (response.data.status) {
                 // console.log(response.data.conversation)
                 setConversation(response.data.conversation)
-
+                localStorage.setItem('conversation_id', conversation_id);
+                // ScrollerHandler()
+                // console.log(conversation_id)
+                // chat_div.current = document.getElementById("chat_div")
+                // let chat = chat_div.current
+                // chat.scrollTop = chat.scrollHeight
             }
             else dispatch(notificationHandler(response.data.message))
         } catch (error) {
@@ -174,19 +191,38 @@ const Home = () => {
 
     //Send Message
     const sendMessage = () => {
+        if (!messageInput.trim()) return
+        console.log(conversation._id)
         socket.current.emit("send_message", { conversation_id: conversation._id, message: messageInput })
         setMessageInput("")
+        // setTimeout(ScrollerHandler, 100)
+    }
+
+    const ScrollerHandler = () => {
+        console.log("Scroller Function is running")
+        let elem = document.getElementById('chat-display');
+        let testing = elem.offsetHeight + 100000000;
+        elem.scrollTo(0, testing);
+        // StopScroller();
     }
 
     //Update Chat 
     const updateConversation = (message) => {
-        setConversation(prev => {
-            if (!prev) return prev; // don’t crash if still null
-            return {
-                ...prev,
-                messages: [...(prev.messages), message],
-            };
-        });
+        conversation._id = localStorage.getItem("conversation_id")
+        // console.log(conversation._id)
+        if (conversation._id !== null) {
+            setConversation(prev => {
+                // if (!prev) return prev; // don’t crash if still null
+
+                console.log(prev)
+                console.log(message)
+                return {
+                    ...prev,
+                    messages: [...(prev?.messages), message],
+                };
+            })
+            // setTimeout(ScrollerHandler(), 100)
+        }
     }
     return (
         <div className={styles.home_main_container}>
@@ -331,15 +367,12 @@ const Home = () => {
                                 <AddIcon style={{ "color": 'white' }} />
                             </IconButton> </div>
                             :
-
                             // Listing All Conversations
                             user?.conversation_list?.map((chat) => {
                                 // console.log(chat)
                                 let chat_name
                                 if (!chat?.is_group) {
-                                    // console.log("friend_list : ", user?.friends_list)
                                     let friend = user?.friends_list?.filter(ele => ele._id === chat.participants.filter(participant_id => participant_id !== user._id)[0])[0]
-                                    // console.log("friend : ", friend)
                                     chat_name = friend?.name
                                 }
                                 else chat_name = chat.group_name
@@ -364,26 +397,30 @@ const Home = () => {
 
             {/* Right Side */}
             < div className={styles.chat_main_container}>
-                <div className={styles.chat_display_container}>
+                <div id="chat-display" className={styles.chat_display_container} ref={chat_div}>
                     {
                         conversation?.messages?.map((message, index) => {
+                            message["time"] = `${new Date(message.created_date).getHours()} : ${new Date(message.created_date).getMinutes()}`
                             return (
                                 <div key={message?._id}>
-
                                     {addDateLable(conversation?.messages, index)}
                                     {message?.sender !== user._id ?
                                         <div className={styles.message_main_container + " " + styles.receiver_message}>
                                             <div className={styles.message_box}>
                                                 <div className={styles.message}>{message?.message}</div>
-                                                <div className={styles.message_time}>{message?.created}</div>
-                                                <div className={styles.message_status}>Seen</div>
+                                                <div className={styles.message_meta}>
+                                                    <div className={styles.message_time}>{message?.time}</div>
+                                                </div>
+                                                {/* <div className={styles.message_status}>Seen</div> */}
                                             </div>
                                         </div> :
                                         <div className={styles.message_main_container + " " + styles.sender_message}>
                                             <div className={styles.message_box}>
                                                 <div className={styles.message}>{message?.message}</div>
-                                                <div className={styles.message_time}>{message?.time}</div>
-                                                <div className={styles.message_status}>Seen</div>
+                                                <div className={styles.message_meta}>
+                                                    <div className={styles.message_time}>{message?.time}</div>
+                                                    <div className={styles.message_status}> Seen</div>
+                                                </div>
                                             </div>
                                         </div>}
                                 </div>
@@ -392,8 +429,22 @@ const Home = () => {
                     }
 
                 </div>
-                <div className={styles.chat_input_container}>
-                    <input type='text' value={messageInput} onChange={(e) => setMessageInput(e.target.value)} placeholder='Write your message here...' />
+                <div className={styles.chat_input_container} >
+                    <input
+                        type='text'
+                        value={messageInput}
+                        onChange={(e) => {
+                            setMessageInput(e.target.value)
+                            // console.error("On change")
+                        }
+                        }
+                        // tabIndex={0}
+                        onKeyDown={(e) => {
+                            // alert("This is a test")
+                            // console.log(e.key)
+                            if (e.key === 'Enter' && messageInput.trim().length > 0) sendMessage()
+                        }}
+                        placeholder='Write your message here...' />
                     <button className={styles.send_button} onClick={sendMessage}>Send</button>
                 </div>
             </div>

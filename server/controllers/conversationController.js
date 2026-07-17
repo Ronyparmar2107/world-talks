@@ -10,6 +10,8 @@ const fetch_conversation = async (req, res) => {
             options: { sort: { created_date: -1 }, limit: 20 },
         }).exec()
 
+        conversation.messages.map(message => {
+        })
         conversation.messages.sort((a, b) => new Date(a.created_date) - new Date(b.created_date))
         res.json({ status: true, conversation })
     } catch (error) {

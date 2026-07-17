@@ -47,7 +47,8 @@ const init_socket = (server) => {
                 .populate('participants', 'name email')
             let new_message = new messages({
                 sender: socket.user._id,
-                message: message
+                message: message,
+                status: 'received'
             })
             await new_message.save()
             conversation.messages.push(new_message._id)
@@ -75,9 +76,8 @@ const init_socket = (server) => {
                     // console.log(recipient)
                     let socket_id = onlineUsersMap.get(recipient._id.toString())
                     // console.log(socket_id, new_message)
+                    new_message.received_by.push({ id: recipient._id, received_at: Date.now() })
                     socket.to(socket_id).emit("receive_message", new_message)
-                    new_message.received_by.push(recipient._id)
-
                 })
             }
             await new_message.save()
