@@ -45,43 +45,47 @@ const init_socket = (server) => {
         socket.on("send_message", async ({ conversation_id, message }) => {
             let conversation = await conversations.findById(conversation_id)
                 .populate('participants', 'name email')
+            //New Message Created 
             let new_message = new messages({
                 sender: socket.user._id,
                 message: message,
-                status: 'received'
+                status: 'sent'
             })
             await new_message.save()
             conversation.messages.push(new_message._id)
             await conversation.save()
-            // console.log(conversation.participants)
-            // console.log(onlineUsersMap)
-            // console.log(user_id)
-            // conversation.participants.map(ele => {
-            //     console.log("for :", ele._id)
-            //     console.log("check user", ele._id.toString() !== user_id)
-            //     console.log("check online", onlineUsersMap.has(ele._id.toString()))
-            //     console.log("check received", !new_message.received_by.includes(e => e.id === ele._id))
-            // })
+
+            // Getting all the participants who are online to send them a message
             let recipients = conversation.participants.
                 filter(ele =>
                     ele._id.toString() !== user_id &&
                     onlineUsersMap.has(ele._id.toString()) &&
                     !new_message.received_by.includes(e => e.id === ele._id))
-            // console.log(recipients)
 
-            socket.emit("receive_message", new_message)
+            const recipientSet = new Set(recipients.map(r => r._id.toString()))
+            const onlineIdSet = new Set(onlineUsersMap.keys())
+
+            let msg_received_by_all_recipients = false
+            if (recipientSet.size !== 0) {
+                msg_received_by_all_recipients = [...recipientSet].every(id => onlineIdSet.has(id))
+            }
+
+            if (msg_received_by_all_recipients) new_message.status = "received"
+
+            socket.emit("receive_message", { conversation_id, message: new_message })
             //Sending back the message to sender as well to update the conversation state will proper data
             if (recipients.length > 0) {
                 recipients.map(recipient => {
-                    // console.log(recipient)
                     let socket_id = onlineUsersMap.get(recipient._id.toString())
-                    // console.log(socket_id, new_message)
                     new_message.received_by.push({ id: recipient._id, received_at: Date.now() })
-                    socket.to(socket_id).emit("receive_message", new_message)
+                    socket.to(socket_id).emit("receive_message", { conversation_id, message: new_message })
                 })
             }
+
             await new_message.save()
         })
+
+
     })
 }
 

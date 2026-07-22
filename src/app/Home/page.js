@@ -29,6 +29,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import { get_socket } from '@/utils/socket'
+import { Socket } from 'socket.io-client'
 
 const BootstrapDialog = styled(Dialog)(({ theme }) => ({
     '& .MuiDialogContent-root': {
@@ -54,11 +55,20 @@ const Home = () => {
     // const [openConversationId, setOpenConversationId] = useState()
     const [conversation, setConversation] = useState({ _id: null, messages: [] })
 
+    // Tracks whichever conversation is actually on screen right now. Read inside the
+    // socket listener instead of `conversation` directly, since that listener is only
+    // ever attached once (see effect below) and would otherwise close over a stale value.
+    const openConversationId = useRef(null)
+
     const [addFriend, setAddFriend] = useState()
 
     const [messageInput, setMessageInput] = useState('')
 
     const dispatch = useDispatch()
+
+    useEffect(() => {
+        openConversationId.current = conversation?._id ?? null
+    }, [conversation?._id])
 
     useEffect(() => {
         ScrollerHandler()
@@ -67,16 +77,21 @@ const Home = () => {
         if (!socket.current) {
             socket.current = get_socket()
         }
-        // console.log(socket)
-        socket.current.on("receive_message", (new_message) => {
-            // console.log("received message", new_message)
-            updateConversation(new_message)
-        })
+
+        const handleReceiveMessage = ({ conversation_id, message }) => {
+            // Only append the message if its conversation is the one currently open.
+            // Otherwise it belongs to a chat the user hasn't opened - ignore it here.
+            if (conversation_id === openConversationId.current) {
+                updateConversation(message)
+            }
+        }
+
+        socket.current.on("receive_message", handleReceiveMessage)
 
         dispatch(fetchUser(token))
 
         return () => {
-            socket.current.off("received_message")
+            socket.current.off("receive_message", handleReceiveMessage)
         }
     }, [dispatch])
 
@@ -175,7 +190,6 @@ const Home = () => {
             if (response.data.status) {
                 // console.log(response.data.conversation)
                 setConversation(response.data.conversation)
-                localStorage.setItem('conversation_id', conversation_id);
                 // ScrollerHandler()
                 // console.log(conversation_id)
                 // chat_div.current = document.getElementById("chat_div")
@@ -206,23 +220,14 @@ const Home = () => {
         // StopScroller();
     }
 
-    //Update Chat 
+    //Update Chat
+    // Called only for messages belonging to the currently open conversation
+    // (that check now happens in the "receive_message" listener above).
     const updateConversation = (message) => {
-        conversation._id = localStorage.getItem("conversation_id")
-        // console.log(conversation._id)
-        if (conversation._id !== null) {
-            setConversation(prev => {
-                // if (!prev) return prev; // don’t crash if still null
-
-                console.log(prev)
-                console.log(message)
-                return {
-                    ...prev,
-                    messages: [...(prev?.messages), message],
-                };
-            })
-            // setTimeout(ScrollerHandler(), 100)
-        }
+        setConversation(prev => ({
+            ...prev,
+            messages: [...(prev?.messages ?? []), message],
+        }))
     }
     return (
         <div className={styles.home_main_container}>
@@ -356,6 +361,7 @@ const Home = () => {
                         <MenuItem onClick={() => {
                             setOpenProfileMenu(null)
                             dispatch(logoutHandler())
+                            socket.current.disconnect()
                         }}>Logout</MenuItem>
                     </Menu>
                 </div>
@@ -419,7 +425,7 @@ const Home = () => {
                                                 <div className={styles.message}>{message?.message}</div>
                                                 <div className={styles.message_meta}>
                                                     <div className={styles.message_time}>{message?.time}</div>
-                                                    <div className={styles.message_status}> Seen</div>
+                                                    <div className={styles.message_status}> {message?.status}</div>
                                                 </div>
                                             </div>
                                         </div>}
