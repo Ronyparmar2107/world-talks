@@ -28,7 +28,7 @@ import {
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
-import { get_socket } from '@/utils/socket'
+import { get_socket, disconnect_socket } from '@/utils/socket'
 import { Socket } from 'socket.io-client'
 
 const BootstrapDialog = styled(Dialog)(({ theme }) => ({
@@ -73,6 +73,7 @@ const Home = () => {
     useEffect(() => {
         ScrollerHandler()
     }, [conversation.messages])
+
     useEffect(() => {
         if (!socket.current) {
             socket.current = get_socket()
@@ -81,17 +82,20 @@ const Home = () => {
         const handleReceiveMessage = ({ conversation_id, message }) => {
             // Only append the message if its conversation is the one currently open.
             // Otherwise it belongs to a chat the user hasn't opened - ignore it here.
+            console.log("Here", conversation_id, openConversationId.current);
+
             if (conversation_id === openConversationId.current) {
                 updateConversation(message)
             }
         }
-
         socket.current.on("receive_message", handleReceiveMessage)
+        socket.current.on("message_status_update", handleReceiveMessage)
 
         dispatch(fetchUser(token))
 
         return () => {
             socket.current.off("receive_message", handleReceiveMessage)
+            socket.current.off("message_status_update", handleReceiveMessage)
         }
     }, [dispatch])
 
@@ -221,13 +225,19 @@ const Home = () => {
     }
 
     //Update Chat
-    // Called only for messages belonging to the currently open conversation
-    // (that check now happens in the "receive_message" listener above).
     const updateConversation = (message) => {
-        setConversation(prev => ({
-            ...prev,
-            messages: [...(prev?.messages ?? []), message],
-        }))
+
+        setConversation(prev => {
+            if (!prev?.messages) return prev
+            const alreadyExists = prev.messages.some(m => m._id === message._id)
+            console.log(alreadyExists, prev.messages, message)
+            return {
+                ...prev,
+                messages: alreadyExists
+                    ? prev.messages.map(m => m._id === message._id ? message : m)
+                    : [...prev.messages, message]
+            }
+        })
     }
     return (
         <div className={styles.home_main_container}>
@@ -362,6 +372,7 @@ const Home = () => {
                             setOpenProfileMenu(null)
                             dispatch(logoutHandler())
                             socket.current.disconnect()
+                            disconnect_socket()
                         }}>Logout</MenuItem>
                     </Menu>
                 </div>

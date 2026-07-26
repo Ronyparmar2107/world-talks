@@ -1,6 +1,7 @@
 const { Server } = require("socket.io")
 const { conversations, messages } = require("../models/conversation");
-const jwt = require("jsonwebtoken")
+const jwt = require("jsonwebtoken");
+const { users } = require("../models/users");
 
 let io;
 
@@ -39,7 +40,76 @@ const init_socket = (server) => {
         if (!onlineUsersMap.has(user_id)) {
             onlineUsersMap.set(user_id, new Set())
         }
-        onlineUsersMap.set(user_id, socket.id)
+        onlineUsersMap.get(user_id).add(socket.id);
+
+
+        //User is online, Marking all the pending messages as received 
+        (async () => {
+            try {
+
+                const user = await users.findById(user_id).select("conversation_list")
+                const pending_messages = await messages.find({
+                    conversation: { $in: user.conversation_list },
+                    sender: { $ne: user_id },
+                    status: 'sent',
+                    'received_by.id': { $ne: user_id }
+                }).populate('conversation', 'participants')
+
+                console.log(pending_messages, user_id)
+                if (pending_messages.length === 0) return
+
+                const bulkOperation = []
+                const bySender = {}
+                // console.log("In Map fxn")
+
+                pending_messages.map(msg => {
+                    const recipient_count = msg.conversation.participants.filter(ele => ele.toString() !== msg.sender.toString()).length
+                    const fully_received = (msg.received_by.length + 1) >= recipient_count
+                    // console.log(msg.conversation.participants)
+                    console.log(recipient_count, fully_received)
+
+                    const update = { $push: { received_by: { id: user_id, received_at: Date.now() } } }
+                    msg.received_by.push({ received_by: { id: user_id, received_at: Date.now() } })
+
+                    if (fully_received) {
+                        update.$set = { status: 'received' }
+                        msg.status = 'received'
+                    }
+                    bulkOperation.push({ updateOne: { filter: { _id: msg._id }, update } })
+                    console.log(JSON.stringify(bulkOperation, null, 2))
+                    if (fully_received) {
+                        const senderId = msg.sender.toString()
+                            ; (bySender[senderId] ??= []).push({ conversation_id: msg.conversation._id.toString(), message: msg })
+                    }
+
+                })
+
+                if (bulkOperation.length !== 0) await messages.bulkWrite(bulkOperation)
+                // console.log("ALl msgs done")
+                Object.entries(bySender).forEach(([senderId, updates]) => {
+                    console.log(updates);
+
+                    socket.to(senderId).emit("message_status_update", ...updates)
+                })
+            }
+            catch (err) {
+                console.log("Something went wrong while Marking messages received", err)
+            }
+        })()
+
+        //Socket Going Offline
+        socket.on("disconnect", () => {
+
+            // console.log("Socket Close")
+            let sockets = onlineUsersMap.get(user_id)
+            if (sockets) {
+                sockets.delete(socket.id)
+                if (sockets.size === 0) {
+                    onlineUsersMap.delete(user_id)
+                    // console.log(user_id, " is offline ")
+                }
+            }
+        })
 
         //Sending a message 
         socket.on("send_message", async ({ conversation_id, message }) => {
@@ -49,6 +119,7 @@ const init_socket = (server) => {
             let new_message = new messages({
                 sender: socket.user._id,
                 message: message,
+                conversation: conversation_id,
                 status: 'sent'
             })
             await new_message.save()

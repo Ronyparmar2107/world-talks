@@ -80,6 +80,7 @@ const userSlice = createSlice({
     initialState,
     reducers: {
         notificationHandler: (state, action) => {
+            console.log("State", state)
             state.notification = action.payload
             state.notification_toggle = !state.notification_toggle
         },
@@ -107,19 +108,24 @@ const userSlice = createSlice({
                 let data = action.payload
                 console.log(data)
                 if (data.status) {
+                    // console.log("Are you coming here?")
                     state.isLogin = true
                     state.token = data.token
                     localStorage.setItem("token", data.token)
                     init_socket(data.token)
                 }
                 else {
-                    notificationHandler(data.error)
+                    // console.log("In exception Handler")
+                    state.notification = data.error
+                    state.notification_toggle = !state.notification_toggle
                 }
                 state.isLoading = false
             })
             .addCase(loginUser.rejected, (state) => {
                 state.isLoading = false
-                notificationHandler('Server not reachable.')
+                state.notification = 'Server not reachable.'
+                state.notification_toggle = !state.notification_toggle
+                // notificationHandler('Server not reachable.')
             })
             .addCase(fetchUser.pending, (state) => {
                 state.isLoading = true
@@ -134,7 +140,8 @@ const userSlice = createSlice({
                     }
                 }
                 else {
-                    notificationHandler(data.error)
+                    state.notification = data.error
+                    state.notification_toggle = !state.notification_toggle
                 }
                 state.isLoading = false
             })

@@ -39,3 +39,11 @@ export const get_socket = () => {
     if (!socket) throw new Error("Socket not initialized");
     return socket
 }
+
+export const disconnect_socket = () => {
+    // console.log("in disconnect")
+    if (socket) {
+        socket.disconnect()
+        socket = null
+    }
+}

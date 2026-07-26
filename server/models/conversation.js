@@ -33,6 +33,11 @@ const messageSchema = new Schema({
         type: String,
         required: true
     },
+    conversation: {
+        type: Schema.Types.ObjectId,
+        ref: "conversation",
+        required: true
+    },
     created_date: {
         type: Date,
         default: Date.now
