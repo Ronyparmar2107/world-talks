@@ -16,10 +16,10 @@ world-talks/
 │   ├── config/
 │   │   └── db.js                    Mongoose connection (DB_URL)
 │   ├── socket/
-│   │   └── socket.js                Socket.io init: JWT-auth'd handshake, online-user map, send_message/receive_message
+│   │   └── socket.js                Socket.io init: JWT-auth'd handshake, per-user Set of online sockets, disconnect cleanup, send_message/receive_message, marks pending messages received on reconnect
 │   ├── models/
 │   │   ├── users.js                 user: name, email, password, friends_list, conversation_list, requests[]
-│   │   └── conversation.js          conversation + message schemas (participants, messages, is_group/group_name; message: sender, status, seen_by, received_by)
+│   │   └── conversation.js          conversation + message schemas (participants, messages, is_group/group_name; message: sender, conversation ref, status, seen_by, received_by)
 │   ├── controllers/
 │   │   ├── userController.js        auth_user, create_user, get_user, send_request, manage_request
 │   │   └── conversationController.js  fetch_conversation (paginated, last 20 messages)
@@ -58,20 +58,37 @@ world-talks/
 - Friend requests: send, accept, reject
 - Auto-created 1:1 conversation once a request is accepted
 - Real-time messaging over an authenticated Socket.io connection
-- In-memory online-user tracking to route messages to connected recipients
-- Message read/received-receipt schema (`seen_by`, `received_by`)
+- Per-user online tracking (a `Set` of socket ids, so multiple tabs/devices don't clobber each other) with proper cleanup on disconnect
+- Delivery receipts: messages move `sent` → `received` automatically when the recipient reconnects, applied via a single `bulkWrite` and only once *every* recipient has received it (already correct for group chats, even though only 1:1 exists today)
+- Live status updates: the sender's screen updates the moment a message flips to `received`, via a `message_status_update` socket event — no manual refresh needed
+- Logging out properly tears down the socket connection so logging back in (without a full page reload) reconnects cleanly
 - Paginated chat history (last 20 messages per load)
 - Global notification snackbar wired through Redux
 
 ## Known gaps / in progress
 
+- "Seen" status doesn't exist yet — only sent/received. Same reconnect-based approach, triggered by opening a conversation instead of connecting
 - `get_users`, `delete_user`, `update_user` controllers are empty stubs
 - `sendRequest` thunk is commented out in `userSlice.js`, but `Home/page.js` still imports it — dead import; `addFriendHandler` calls the API directly instead
 - Group chat: schema supports `is_group`/`group_name` but there's no UI/flow to create one
 - `dummy_data/` (`friends_list.js`, `conversations.js`) is still imported in `Home/page.js` and should be removed once real data is fully wired in
-- Message status UI is a static "Seen" label, not driven by `seen_by` yet
+- Date separators in the chat (`addDateLable` in `Home/page.js`) use `getDay()` (day of week) instead of `getDate()` (day of month) — known bug, not yet fixed
+- `message_status_update` is emitted as `socket.to(senderId).emit(event, ...updates)` — spreads an array as separate arguments, so if a sender has more than one pending message batched into one event, only the first currently reaches the client. Fine today since batches are effectively always size 1, but worth fixing to emit `updates` as a single array before relying on it
+- No message pagination beyond the initial 20 — no way to load older history once scrolled to the top
+- No input validation anywhere (email format, password strength, message length)
 - Socket.io CORS is wide open (`origin: "*"`) — restrict before deploying
 - Online-user map is in-memory (`Map`), fine for single-instance dev, won't survive restarts or scale horizontally
+
+## Roadmap
+
+Roughly in the order it makes sense to tackle them:
+
+1. **Seen status + message info + date bug fix** — bundled together since they're the same code area (message rendering / receipts) already fresh from delivery receipts work.
+2. **Responsive / cross-platform UI** — before adding more UI surface (group chat, profile editing), so those get built responsive from the start instead of needing a second pass.
+3. **Group conversation, friend search/discovery, profile editing** — feature-completeness pass. Backend groundwork for groups is already in place (the receipt logic is written to require *every* recipient, not just one).
+4. **Google Auth** — stretch/optional. Real complexity (OAuth flow, account linking if an email already has a password-based account) that doesn't change the core chat experience — worth doing if it matters personally (e.g. portfolio value), not essential to the product.
+5. **Pre-deployment security pass** — restrict Socket.io CORS, rotate secrets currently in `.env`, add basic rate limiting on auth endpoints, add the input validation noted above.
+6. **Deployment** — Next.js frontend to Vercel; Express/Socket.io backend needs a host with persistent WebSocket support (Render/Railway/Fly.io, not serverless).
 
 ## Setup
 
