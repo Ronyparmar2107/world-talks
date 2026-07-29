@@ -64,15 +64,15 @@ world-talks/
 - Logging out properly tears down the socket connection so logging back in (without a full page reload) reconnects cleanly
 - Paginated chat history (last 20 messages per load)
 - Global notification snackbar wired through Redux
+- Date separators between messages correctly use day-of-month/month/year (were previously comparing day-of-week, which hid separators between same-weekday messages a week apart)
 
 ## Known gaps / in progress
 
-- "Seen" status doesn't exist yet — only sent/received. Same reconnect-based approach, triggered by opening a conversation instead of connecting
+- "Seen" status doesn't exist yet — only sent/received. Same reconnect-based approach, planned to trigger on opening a conversation instead of connecting
 - `get_users`, `delete_user`, `update_user` controllers are empty stubs
 - `sendRequest` thunk is commented out in `userSlice.js`, but `Home/page.js` still imports it — dead import; `addFriendHandler` calls the API directly instead
 - Group chat: schema supports `is_group`/`group_name` but there's no UI/flow to create one
 - `dummy_data/` (`friends_list.js`, `conversations.js`) is still imported in `Home/page.js` and should be removed once real data is fully wired in
-- Date separators in the chat (`addDateLable` in `Home/page.js`) use `getDay()` (day of week) instead of `getDate()` (day of month) — known bug, not yet fixed
 - `message_status_update` is emitted as `socket.to(senderId).emit(event, ...updates)` — spreads an array as separate arguments, so if a sender has more than one pending message batched into one event, only the first currently reaches the client. Fine today since batches are effectively always size 1, but worth fixing to emit `updates` as a single array before relying on it
 - No message pagination beyond the initial 20 — no way to load older history once scrolled to the top
 - No input validation anywhere (email format, password strength, message length)

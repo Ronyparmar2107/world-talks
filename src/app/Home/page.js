@@ -104,25 +104,24 @@ const Home = () => {
     // Still Need to work on it
     const addDateLable = (messages, index) => {
         let current_date = new Date(messages[index]?.created_date)
-        let current_day = current_date.getDay()
+        let current_day = current_date.getDate()
         let current_month = current_date.getMonth()
         let current_year = current_date.getFullYear()
 
-        let dateLable = < div className={styles.chat_date_container}>
+        let dateLable = <div className={styles.chat_date_container}>
             <div className={styles.chat_date}>
-                {`${current_day} / ${current_month} / ${current_year}`}
+                {`${current_day} / ${current_month + 1} / ${current_year}`}
             </div>
-        </div >
+        </div>
 
         if (index === 0) {
             return dateLable
         }
         else {
             let previous_date = new Date(messages[index - 1]?.created_date)
-            let previous_day = previous_date.getDay()
+            let previous_day = previous_date.getDate()
             let previous_month = previous_date.getMonth()
             let previous_year = previous_date.getFullYear()
-            let prev_element = messages[index - 1]
             if (previous_day === current_day && previous_month === current_month && previous_year === current_year) return <></>
             else return dateLable
         }
@@ -192,13 +191,7 @@ const Home = () => {
                     }
                 })
             if (response.data.status) {
-                // console.log(response.data.conversation)
                 setConversation(response.data.conversation)
-                // ScrollerHandler()
-                // console.log(conversation_id)
-                // chat_div.current = document.getElementById("chat_div")
-                // let chat = chat_div.current
-                // chat.scrollTop = chat.scrollHeight
             }
             else dispatch(notificationHandler(response.data.message))
         } catch (error) {
@@ -422,7 +415,7 @@ const Home = () => {
                                 <div key={message?._id}>
                                     {addDateLable(conversation?.messages, index)}
                                     {message?.sender !== user._id ?
-                                        <div className={styles.message_main_container + " " + styles.receiver_message}>
+                                        (<div className={styles.message_main_container + " " + styles.receiver_message}>
                                             <div className={styles.message_box}>
                                                 <div className={styles.message}>{message?.message}</div>
                                                 <div className={styles.message_meta}>
@@ -430,8 +423,8 @@ const Home = () => {
                                                 </div>
                                                 {/* <div className={styles.message_status}>Seen</div> */}
                                             </div>
-                                        </div> :
-                                        <div className={styles.message_main_container + " " + styles.sender_message}>
+                                        </div>) :
+                                        (<div className={styles.message_main_container + " " + styles.sender_message}>
                                             <div className={styles.message_box}>
                                                 <div className={styles.message}>{message?.message}</div>
                                                 <div className={styles.message_meta}>
@@ -439,7 +432,7 @@ const Home = () => {
                                                     <div className={styles.message_status}> {message?.status}</div>
                                                 </div>
                                             </div>
-                                        </div>}
+                                        </div>)}
                                 </div>
                             )
                         })
