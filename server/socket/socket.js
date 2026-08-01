@@ -5,7 +5,10 @@ const { users } = require("../models/users");
 
 let io;
 
+let loggedInUsersMap = new Map()
 let onlineUsersMap = new Map()
+let openConversationsMap = new Map()
+
 const init_socket = (server) => {
     io = new Server(server, {
         cors: {
@@ -31,19 +34,32 @@ const init_socket = (server) => {
         }
     });
 
+    //Helper to check the openConversation for Seen status
+    const hasLiveView = (user_id, conversation_id) => {
+        const logged_in_sockets = loggedInUsersMap.get(user_id)
+        const focused_sockets = onlineUsersMap.get(user_id)
+        if (!logged_in_sockets || !focused_sockets) return false
+
+        for (const socket_id of logged_in_sockets) {
+            if (focused_sockets.has(socket_id) && openConversationsMap.get(socket_id) === conversation_id) {
+                return true
+            }
+        }
+        return false
+    }
 
     io.on("connection", (socket) => {
         let user_id = socket.user._id
         socket.join(user_id)
 
-        //Maintaining Global List of users online 
-        if (!onlineUsersMap.has(user_id)) {
-            onlineUsersMap.set(user_id, new Set())
+        //Maintaining Global List of users loggedIn 
+        if (!loggedInUsersMap.has(user_id)) {
+            loggedInUsersMap.set(user_id, new Set())
         }
-        onlineUsersMap.get(user_id).add(socket.id);
+        loggedInUsersMap.get(user_id).add(socket.id);
 
 
-        //User is online, Marking all the pending messages as received 
+        //User is loggedIn, Marking all the pending messages as received 
         (async () => {
             try {
 
@@ -97,17 +113,45 @@ const init_socket = (server) => {
             }
         })()
 
-        //Socket Going Offline
+        //User loggedOut
         socket.on("disconnect", () => {
 
             // console.log("Socket Close")
-            let sockets = onlineUsersMap.get(user_id)
-            if (sockets) {
-                sockets.delete(socket.id)
-                if (sockets.size === 0) {
-                    onlineUsersMap.delete(user_id)
+            let loggedIn_sockets = loggedInUsersMap.get(user_id)
+            let online_sockets = onlineUsersMap.get(user_id)
+            let conversations_open = openConversationsMap.get(socket.id)
+
+
+
+            if (loggedIn_sockets) {
+                loggedIn_sockets.delete(socket.id)
+                if (online_sockets) online_sockets.delete(socket.id)
+                if (conversations_open) openConversationsMap.delete(socket.id)
+
+                if (loggedIn_sockets.size === 0) {
+                    loggedInUsersMap.delete(user_id)
+                    if (online_sockets && online_sockets.size === 0) onlineUsersMap.delete(user_id)
                     // console.log(user_id, " is offline ")
                 }
+            }
+        })
+
+        //User is Online/Focused on App
+        socket.on("user_focus", () => {
+            //Maintaining Global List of users online 
+            if (!onlineUsersMap.has(user_id)) {
+                onlineUsersMap.set(user_id, new Set())
+            }
+            onlineUsersMap.get(user_id).add(socket.id);
+
+        })
+
+        //User is offline/Off-focused on App
+        socket.on("user_blur", () => {
+            let online_sockets = onlineUsersMap.get(user_id)
+            if (online_sockets) {
+                online_sockets.delete(socket.id)
+                if (online_sockets.size === 0) onlineUsersMap.delete(user_id)
             }
         })
 
@@ -130,16 +174,14 @@ const init_socket = (server) => {
             let recipients = conversation.participants.
                 filter(ele =>
                     ele._id.toString() !== user_id &&
-                    onlineUsersMap.has(ele._id.toString()) &&
-                    !new_message.received_by.includes(e => e.id === ele._id))
+                    loggedInUsersMap.has(ele._id.toString()))
 
-            const recipientSet = new Set(recipients.map(r => r._id.toString()))
-            const onlineIdSet = new Set(onlineUsersMap.keys())
+            //Getting a count of all recipients 
+            const total_recipients = conversation.participants.filter(p => p._id.toString() !== user_id).length
+            //Comparing Online recipients with all the recipients
+            const msg_received_by_all_recipients = total_recipients > 0 && recipients.length === total_recipients
 
-            let msg_received_by_all_recipients = false
-            if (recipientSet.size !== 0) {
-                msg_received_by_all_recipients = [...recipientSet].every(id => onlineIdSet.has(id))
-            }
+
 
             if (msg_received_by_all_recipients) new_message.status = "received"
 
@@ -147,13 +189,23 @@ const init_socket = (server) => {
             //Sending back the message to sender as well to update the conversation state will proper data
             if (recipients.length > 0) {
                 recipients.map(recipient => {
-                    let socket_id = onlineUsersMap.get(recipient._id.toString())
                     new_message.received_by.push({ id: recipient._id, received_at: Date.now() })
-                    socket.to(socket_id).emit("receive_message", { conversation_id, message: new_message })
+                    socket.to(recipient._id.toString()).emit("receive_message", { conversation_id, message: new_message })
                 })
             }
 
             await new_message.save()
+        })
+
+        //User's conversation is opened
+        socket.on("conversation_open", (conversation_id) => {
+            openConversationsMap.set(socket.id, conversation_id)
+        })
+
+        //User's conversation is closed
+        socket.on("conversation_close", () => {
+            openConversationsMap.delete(socket.id)
+
         })
 
 

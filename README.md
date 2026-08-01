@@ -58,8 +58,10 @@ world-talks/
 - Friend requests: send, accept, reject
 - Auto-created 1:1 conversation once a request is accepted
 - Real-time messaging over an authenticated Socket.io connection
-- Per-user online tracking (a `Set` of socket ids, so multiple tabs/devices don't clobber each other) with proper cleanup on disconnect
-- Delivery receipts: messages move `sent` → `received` automatically when the recipient reconnects, applied via a single `bulkWrite` and only once *every* recipient has received it (already correct for group chats, even though only 1:1 exists today)
+- Per-user connection tracking (`loggedInUsersMap`, a `Set` of socket ids per user so multiple tabs/devices don't clobber each other) with proper cleanup on disconnect
+- Focus-based presence tracking, kept separate from connection state (`onlineUsersMap`), driven by `user_focus`/`user_blur` socket events emitted on window focus/blur
+- Per-socket open-conversation tracking (`openConversationsMap`) with a `hasLiveView(user_id, conversation_id)` check — foundation for real-time "seen" receipts
+- Delivery receipts: messages move `sent` → `received` automatically when the recipient reconnects, applied via a single `bulkWrite` and only once *every* recipient has received it — group-chat-safe (fixed a bug where a message could flip to "received" after just one online recipient instead of comparing against the full recipient count)
 - Live status updates: the sender's screen updates the moment a message flips to `received`, via a `message_status_update` socket event — no manual refresh needed
 - Logging out properly tears down the socket connection so logging back in (without a full page reload) reconnects cleanly
 - Paginated chat history (last 20 messages per load)
@@ -68,7 +70,8 @@ world-talks/
 
 ## Known gaps / in progress
 
-- "Seen" status doesn't exist yet — only sent/received. Same reconnect-based approach, planned to trigger on opening a conversation instead of connecting
+- "Seen" status is mid-implementation: server-side foundation (`openConversationsMap`, `hasLiveView`) is in place and the client now correctly emits `message_seen` with `openConversationId.current` on opening a conversation and on receiving a focused message, but `send_message` doesn't call `hasLiveView` yet (no instant-seen or `seen_by` writes), and there's no standalone server-side `message_seen` handler yet for the catch-up case (message arrives while away, seen later on open) — so nothing updates `seen_by`/`status` server-side yet even though the client is signaling correctly
+- Focus/online status is tracked server-side but not yet exposed through any API — friends list has no live online indicator yet
 - `get_users`, `delete_user`, `update_user` controllers are empty stubs
 - `sendRequest` thunk is commented out in `userSlice.js`, but `Home/page.js` still imports it — dead import; `addFriendHandler` calls the API directly instead
 - Group chat: schema supports `is_group`/`group_name` but there's no UI/flow to create one
@@ -83,7 +86,7 @@ world-talks/
 
 Roughly in the order it makes sense to tackle them:
 
-1. **Seen status + message info + date bug fix** — bundled together since they're the same code area (message rendering / receipts) already fresh from delivery receipts work.
+1. **Seen status + message info** — finish wiring `hasLiveView` into `send_message` for instant seen, add the `message_seen` catch-up handler, fix the client-side ref bug, then build message info UI on top of the same data.
 2. **Responsive / cross-platform UI** — before adding more UI surface (group chat, profile editing), so those get built responsive from the start instead of needing a second pass.
 3. **Group conversation, friend search/discovery, profile editing** — feature-completeness pass. Backend groundwork for groups is already in place (the receipt logic is written to require *every* recipient, not just one).
 4. **Google Auth** — stretch/optional. Real complexity (OAuth flow, account linking if an email already has a password-based account) that doesn't change the core chat experience — worth doing if it matters personally (e.g. portfolio value), not essential to the product.

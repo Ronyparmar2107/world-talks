@@ -90,6 +90,7 @@ const Home = () => {
         }
         socket.current.on("receive_message", handleReceiveMessage)
         socket.current.on("message_status_update", handleReceiveMessage)
+        socket.current.on("message_seen", handleReceiveMessage)
 
         dispatch(fetchUser(token))
 
@@ -192,6 +193,7 @@ const Home = () => {
                 })
             if (response.data.status) {
                 setConversation(response.data.conversation)
+                socket.current.emit("message_seen", { conversation_id: openConversationId.current })
             }
             else dispatch(notificationHandler(response.data.message))
         } catch (error) {
@@ -223,7 +225,7 @@ const Home = () => {
         setConversation(prev => {
             if (!prev?.messages) return prev
             const alreadyExists = prev.messages.some(m => m._id === message._id)
-            console.log(alreadyExists, prev.messages, message)
+            // console.log(alreadyExists, prev.messages, message)
             return {
                 ...prev,
                 messages: alreadyExists
@@ -231,6 +233,9 @@ const Home = () => {
                     : [...prev.messages, message]
             }
         })
+        if (message.sender !== user._id && document.hasFocus()) {
+            socket.current.emit("message_seen", { conversation_id: openConversationId.current })
+        }
     }
     return (
         <div className={styles.home_main_container}>
