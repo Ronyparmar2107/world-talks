@@ -2,6 +2,7 @@ const { Server } = require("socket.io")
 const { conversations, messages } = require("../models/conversation");
 const jwt = require("jsonwebtoken");
 const { users } = require("../models/users");
+const { use } = require("react");
 
 let io;
 
@@ -82,7 +83,7 @@ const init_socket = (server) => {
                     const recipient_count = msg.conversation.participants.filter(ele => ele.toString() !== msg.sender.toString()).length
                     const fully_received = (msg.received_by.length + 1) >= recipient_count
                     // console.log(msg.conversation.participants)
-                    console.log(recipient_count, fully_received)
+                    // console.log(recipient_count, fully_received)
 
                     const update = { $push: { received_by: { id: user_id, received_at: Date.now() } } }
                     msg.received_by.push({ received_by: { id: user_id, received_at: Date.now() } })
@@ -92,10 +93,10 @@ const init_socket = (server) => {
                         msg.status = 'received'
                     }
                     bulkOperation.push({ updateOne: { filter: { _id: msg._id }, update } })
-                    console.log(JSON.stringify(bulkOperation, null, 2))
+                    // console.log(JSON.stringify(bulkOperation, null, 2))
                     if (fully_received) {
-                        const senderId = msg.sender.toString()
-                            ; (bySender[senderId] ??= []).push({ conversation_id: msg.conversation._id.toString(), message: msg })
+                        const senderId = msg.sender.toString();
+                        (bySender[senderId] ??= []).push({ conversation_id: msg.conversation._id.toString(), message: msg })
                     }
 
                 })
@@ -144,6 +145,12 @@ const init_socket = (server) => {
             }
             onlineUsersMap.get(user_id).add(socket.id);
 
+            //Checking if there was a chat open when came back to focus
+            const open_conversation_id = openConversationsMap.get(socket.id)
+            //if chat was open marking the messages as seen
+            if (open_conversation_id) markAsSeen(open_conversation_id)
+
+            // console.log(onlineUsersMap)
         })
 
         //User is offline/Off-focused on App
@@ -153,6 +160,7 @@ const init_socket = (server) => {
                 online_sockets.delete(socket.id)
                 if (online_sockets.size === 0) onlineUsersMap.delete(user_id)
             }
+            // console.log(onlineUsersMap)
         })
 
         //Sending a message 
@@ -181,15 +189,19 @@ const init_socket = (server) => {
             //Comparing Online recipients with all the recipients
             const msg_received_by_all_recipients = total_recipients > 0 && recipients.length === total_recipients
 
+            const msg_seen_by = recipients.filter(recipient => hasLiveView(recipient._id.toString(), new_message.conversation._id.toString()))
 
-
-            if (msg_received_by_all_recipients) new_message.status = "received"
+            if (msg_received_by_all_recipients) {
+                if (recipients.length === msg_seen_by.length) new_message.status = "seen"
+                else new_message.status = "received"
+            }
 
             socket.emit("receive_message", { conversation_id, message: new_message })
             //Sending back the message to sender as well to update the conversation state will proper data
             if (recipients.length > 0) {
                 recipients.map(recipient => {
-                    new_message.received_by.push({ id: recipient._id, received_at: Date.now() })
+                    new_message.received_by.push({ id: recipient._id })
+                    if (msg_seen_by.includes(recipient._id)) new_message.seen_by.push({ seen_by: recipient._id, seen_at: Date.now() })
                     socket.to(recipient._id.toString()).emit("receive_message", { conversation_id, message: new_message })
                 })
             }
@@ -200,14 +212,51 @@ const init_socket = (server) => {
         //User's conversation is opened
         socket.on("conversation_open", (conversation_id) => {
             openConversationsMap.set(socket.id, conversation_id)
+            markAsSeen(conversation_id)
+            // console.log(openConversationsMap)
         })
 
         //User's conversation is closed
         socket.on("conversation_close", () => {
             openConversationsMap.delete(socket.id)
-
+            // console.log(openConversationsMap)
         })
 
+        const markAsSeen = async (conversation_id) => {
+            let unseen_messages = await messages.find({
+                conversation: conversation_id,
+                sender: { $ne: user_id },
+                status: 'received',
+                'seen_by.seen_by': { $ne: user_id }
+            }).populate('conversation', 'participants')
+
+
+            let bulkOperation = []
+
+            if (unseen_messages.length === 0) return
+            unseen_messages.map(msg => {
+
+                //Getting a count of all recipients 
+                const total_recipients = msg.conversation.participants.filter(p => p._id.toString() !== msg.sender.toString()).length
+                //Comparing Online recipients with all the recipients
+                const msg_seen_by_all_recipients = total_recipients > 0 && (msg.seen_by.length + 1) >= total_recipients
+
+
+                const update = { $push: { seen_by: { seen_by: user_id, seen_at: Date.now() } } }
+                msg.seen_by.push({ seen_by: user_id, seen_at: Date.now() })
+
+                if (msg_seen_by_all_recipients) {
+                    update.$set = { status: 'seen' }
+                    msg.status = 'seen'
+                }
+                bulkOperation.push({ updateOne: { filter: { _id: msg._id }, update } })
+
+                if (loggedInUsersMap.has(msg.sender.toString())) {
+                    socket.to(msg.sender.toString()).emit("message_status_update", { conversation_id, message: msg })
+                }
+            })
+            if (bulkOperation.length !== 0) await messages.bulkWrite(bulkOperation)
+        }
 
     })
 }

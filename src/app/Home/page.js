@@ -28,6 +28,8 @@ import {
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import { get_socket, disconnect_socket } from '@/utils/socket'
 import { Socket } from 'socket.io-client'
 
@@ -71,9 +73,10 @@ const Home = () => {
     }, [conversation?._id])
 
     useEffect(() => {
-        ScrollerHandler()
+        if (conversation?._id) ScrollerHandler()
     }, [conversation.messages])
 
+    //Message Handler
     useEffect(() => {
         if (!socket.current) {
             socket.current = get_socket()
@@ -85,12 +88,12 @@ const Home = () => {
             console.log("Here", conversation_id, openConversationId.current);
 
             if (conversation_id === openConversationId.current) {
+                console.log(message)
                 updateConversation(message)
             }
         }
         socket.current.on("receive_message", handleReceiveMessage)
         socket.current.on("message_status_update", handleReceiveMessage)
-        socket.current.on("message_seen", handleReceiveMessage)
 
         dispatch(fetchUser(token))
 
@@ -102,7 +105,28 @@ const Home = () => {
 
     // console.log(user)
 
-    // Still Need to work on it
+    //User's online Status Handler
+    useEffect(() => {
+        if (!socket.current) return
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") {
+                socket.current.emit("user_focus")
+            } else {
+                socket.current.emit("user_blur")
+            }
+        }
+        handleVisibilityChange()
+
+        document.addEventListener("visibilitychange", handleVisibilityChange)
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange)
+        }
+    }, [])
+
+
+
+
     const addDateLable = (messages, index) => {
         let current_date = new Date(messages[index]?.created_date)
         let current_day = current_date.getDate()
@@ -177,9 +201,15 @@ const Home = () => {
         }
     }
 
-    // Loading a chat 
+    // Loading a chat
     const openChat = async (conversation_id) => {
         setConversation({ _id: conversation_id })
+        // Tell the server this socket is now looking at this conversation - lets
+        // hasLiveView() (and later, instant "seen") know without waiting on the
+        // API call below to finish. Overwrites any conversation this socket had
+        // open before, so no explicit conversation_close is needed when switching
+        // directly between two open chats.
+        socket.current.emit("conversation_open", conversation_id)
         // console.log(conversation_id)
         // setConversation(conversations.find(ele => ele.id === conversation_id))
         try {
@@ -202,6 +232,29 @@ const Home = () => {
         }
     }
 
+    // Backing out of a chat entirely (top bar back button). Unlike switching
+    // between two open chats, there's no next conversation_open to overwrite
+    // this socket's entry, so it has to be cleared explicitly - otherwise the
+    // server keeps thinking this socket is still viewing a chat that's been closed.
+    const closeChat = () => {
+        if (conversation?._id) {
+            socket.current.emit("conversation_close", conversation._id)
+        }
+        setConversation({ _id: null, messages: [] })
+        setMessageInput("")
+    }
+
+    // Resolves what to show in the chat top bar - group name for group chats,
+    // otherwise the other participant's name looked up from friends_list (same
+    // lookup already used for the sidebar chat list).
+    const getChatName = (chat) => {
+        if (!chat) return ""
+        if (chat.is_group) return chat.group_name
+        let friend_id = chat.participants?.find(participant_id => participant_id !== user._id)
+        let friend = user?.friends_list?.find(ele => ele._id === friend_id)
+        return friend?.name ?? ""
+    }
+
     //Send Message
     const sendMessage = () => {
         if (!messageInput.trim()) return
@@ -214,6 +267,7 @@ const Home = () => {
     const ScrollerHandler = () => {
         console.log("Scroller Function is running")
         let elem = document.getElementById('chat-display');
+        if (!elem) return
         let testing = elem.offsetHeight + 100000000;
         elem.scrollTo(0, testing);
         // StopScroller();
@@ -411,7 +465,27 @@ const Home = () => {
             </div>
 
             {/* Right Side */}
-            < div className={styles.chat_main_container}>
+            {conversation?._id === null ? (
+                <div className={styles.empty_chat_container}>
+                    <ChatBubbleOutlineIcon className={styles.empty_chat_icon} />
+                    <h2>World Talks</h2>
+                    <p>Pick a conversation on the left to start chatting.</p>
+                </div>
+            ) : < div className={styles.chat_main_container}>
+                <div className={styles.chat_top_bar}>
+                    <IconButton aria-label="back" onClick={closeChat}>
+                        <ArrowBackIcon style={{ color: 'white' }} />
+                    </IconButton>
+                    <div className={styles.chat_top_bar_avatar}>
+                        <Image
+                            src="/profile.png"
+                            height={32}
+                            width={32}
+                            alt="Picture of the author"
+                        />
+                    </div>
+                    <h4>{getChatName(conversation)}</h4>
+                </div>
                 <div id="chat-display" className={styles.chat_display_container} ref={chat_div}>
                     {
                         conversation?.messages?.map((message, index) => {
@@ -462,7 +536,7 @@ const Home = () => {
                         placeholder='Write your message here...' />
                     <button className={styles.send_button} onClick={sendMessage}>Send</button>
                 </div>
-            </div>
+            </div>}
         </div >
     )
 }

@@ -62,7 +62,10 @@ world-talks/
 - Focus-based presence tracking, kept separate from connection state (`onlineUsersMap`), driven by `user_focus`/`user_blur` socket events emitted on window focus/blur
 - Per-socket open-conversation tracking (`openConversationsMap`) with a `hasLiveView(user_id, conversation_id)` check — foundation for real-time "seen" receipts
 - Delivery receipts: messages move `sent` → `received` automatically when the recipient reconnects, applied via a single `bulkWrite` and only once *every* recipient has received it — group-chat-safe (fixed a bug where a message could flip to "received" after just one online recipient instead of comparing against the full recipient count)
-- Live status updates: the sender's screen updates the moment a message flips to `received`, via a `message_status_update` socket event — no manual refresh needed
+- Full `sent` → `received` → `seen` status, live: `send_message` marks a message `seen` instantly if the recipient is actively viewing that exact conversation (`hasLiveView`, checking connection + focus + open conversation per socket); otherwise `markAsSeen` catches it up when the recipient opens the conversation (`conversation_open`) or regains focus while it's already open (`user_focus`) — both paths write `seen_by`/`status` via `bulkWrite` and notify the sender over `message_status_update`
+- Live status updates: the sender's screen updates the moment a message flips to `received` or `seen`, via a `message_status_update` socket event — no manual refresh needed
+- Chat top bar: back button (returns to the empty state and tells the server the conversation's closed via `conversation_close`, so live-seen tracking stays accurate), avatar, and the conversation's name (friend or group)
+- Empty-state screen when no conversation is open, instead of a bare placeholder
 - Logging out properly tears down the socket connection so logging back in (without a full page reload) reconnects cleanly
 - Paginated chat history (last 20 messages per load)
 - Global notification snackbar wired through Redux
@@ -70,8 +73,10 @@ world-talks/
 
 ## Known gaps / in progress
 
-- "Seen" status is mid-implementation: server-side foundation (`openConversationsMap`, `hasLiveView`) is in place and the client now correctly emits `message_seen` with `openConversationId.current` on opening a conversation and on receiving a focused message, but `send_message` doesn't call `hasLiveView` yet (no instant-seen or `seen_by` writes), and there's no standalone server-side `message_seen` handler yet for the catch-up case (message arrives while away, seen later on open) — so nothing updates `seen_by`/`status` server-side yet even though the client is signaling correctly
+- The client's `message_seen` emit (fired from `openChat` and `updateConversation`) has no server-side listener — only `conversation_open` and `user_focus` actually trigger `markAsSeen`. Currently harmless (those two cover the real cases) but it's dead code that should either get a listener or be removed
+- `updateConversation` on the frontend still reads `message._id`/`user._id` without guarding against a `null` entry in `conversation.messages` (possible from a stale/dangling populate) or `user` not being loaded yet — worth adding defensive checks
 - Focus/online status is tracked server-side but not yet exposed through any API — friends list has no live online indicator yet
+- Message info UI (viewing exactly who's received/seen a message, and when) isn't built yet — the data (`received_by`, `seen_by` with timestamps) already exists
 - `get_users`, `delete_user`, `update_user` controllers are empty stubs
 - `sendRequest` thunk is commented out in `userSlice.js`, but `Home/page.js` still imports it — dead import; `addFriendHandler` calls the API directly instead
 - Group chat: schema supports `is_group`/`group_name` but there's no UI/flow to create one
@@ -86,7 +91,7 @@ world-talks/
 
 Roughly in the order it makes sense to tackle them:
 
-1. **Seen status + message info** — finish wiring `hasLiveView` into `send_message` for instant seen, add the `message_seen` catch-up handler, fix the client-side ref bug, then build message info UI on top of the same data.
+1. **Message info UI** — seen status is now fully live end-to-end; next is surfacing `received_by`/`seen_by` in the UI (who's seen a message, and when), plus cleaning up the dead `message_seen` client emit noted above.
 2. **Responsive / cross-platform UI** — before adding more UI surface (group chat, profile editing), so those get built responsive from the start instead of needing a second pass.
 3. **Group conversation, friend search/discovery, profile editing** — feature-completeness pass. Backend groundwork for groups is already in place (the receipt logic is written to require *every* recipient, not just one).
 4. **Google Auth** — stretch/optional. Real complexity (OAuth flow, account linking if an email already has a password-based account) that doesn't change the core chat experience — worth doing if it matters personally (e.g. portfolio value), not essential to the product.
