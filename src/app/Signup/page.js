@@ -3,9 +3,12 @@ import React from 'react'
 import { Button } from '@mui/material'
 import { useState } from 'react'
 import styles from '../Login/Login.module.css'
+import Link from 'next/link'
 import { useDispatch, useSelector } from 'react-redux'
 import { createUser, notificationHandler } from '@/Redux-Toolkit/Slices/userSlice'
 import { useRouter } from 'next/navigation'
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const Signup = () => {
     const { isLoading } = useSelector(state => state.user)
@@ -17,80 +20,93 @@ const Signup = () => {
         password: '',
         confirm_password: ''
     })
+    const [errors, setErrors] = useState({})
 
     const dispatch = useDispatch()
     const router = useRouter()
 
-    // const isLoading = true
-    const submit_handler = async () => {
+    const validate = () => {
+        let next_errors = {}
+        if (!signupForm.first_name.trim()) next_errors.first_name = "Required"
+        if (!signupForm.last_name.trim()) next_errors.last_name = "Required"
 
-        if (Object.values(signupForm).every(v => v != '')) {
-            if (signupForm.confirm_email === signupForm.email) {
-                if (signupForm.password === signupForm.confirm_password) {
-                    let data = {
-                        name: signupForm.first_name + " " + signupForm.last_name,
-                        email: signupForm.email,
-                        password: signupForm.password
-                    }
-                    let result = await dispatch(createUser(data))
+        if (!signupForm.email.trim()) next_errors.email = "Email is required"
+        else if (!EMAIL_REGEX.test(signupForm.email.trim())) next_errors.email = "Enter a valid email address"
 
-                    if (result.meta.requestStatus === "fulfilled") {
-                        dispatch(notificationHandler("Account Created. Now Login & Start Chatting."))
-                        router.push("/")
-                    }
-                }
-                else dispatch(notificationHandler("Match both the password fields"))
-            }
-            else dispatch(notificationHandler("Match both the email fields"))
-        }
-        else dispatch(notificationHandler("Please Fill all the details in form"))
+        if (!signupForm.confirm_email.trim()) next_errors.confirm_email = "Required"
+        else if (signupForm.confirm_email !== signupForm.email) next_errors.confirm_email = "Emails don't match"
 
+        if (!signupForm.password) next_errors.password = "Password is required"
+        else if (signupForm.password.length < 6) next_errors.password = "At least 6 characters"
+
+        if (!signupForm.confirm_password) next_errors.confirm_password = "Required"
+        else if (signupForm.confirm_password !== signupForm.password) next_errors.confirm_password = "Passwords don't match"
+
+        setErrors(next_errors)
+        return Object.keys(next_errors).length === 0
     }
+
+    const submit_handler = async () => {
+        if (!validate()) {
+            dispatch(notificationHandler("Please fix the highlighted fields"))
+            return
+        }
+
+        let data = {
+            name: signupForm.first_name + " " + signupForm.last_name,
+            email: signupForm.email,
+            password: signupForm.password
+        }
+        let result = await dispatch(createUser(data))
+
+        if (result.meta.requestStatus === "fulfilled") {
+            dispatch(notificationHandler("Account Created. Now Login & Start Chatting."))
+            router.push("/")
+        }
+    }
+
+    const field = (key, label, type = 'text') => (
+        <div className={styles.login_parameter}>
+            <label>{label}</label>
+            <input
+                type={type}
+                className={errors[key] ? styles.input_error : ''}
+                value={signupForm[key]}
+                onChange={(e) => setSignupForm({ ...signupForm, [key]: e.target.value })}
+            />
+            <span className={styles.error_text}>{errors[key]}</span>
+        </div>
+    )
 
     return (
         <div className={styles.login_page}>
             <div className={styles.login_main_container}>
                 <h1>World-Talks</h1>
                 <p>Let&apos;s make your account.</p>
-                <div className={styles.login_parameter}>
-                    <label>First Name</label>
-                    <input value={signupForm.first_name} onChange={(e) => { setSignupForm({ ...signupForm, first_name: e.target.value }) }} type='text' />
-                </div>
-                <div className={styles.login_parameter}>
-                    <label>Last Name</label>
-                    <input value={signupForm.last_name} onChange={(e) => { setSignupForm({ ...signupForm, last_name: e.target.value }) }} type='text' />
-                </div>
-                <div className={styles.login_parameter}>
-                    <label>Email Id</label>
-                    <input value={signupForm.email} onChange={(e) => { setSignupForm({ ...signupForm, email: e.target.value }) }} type='email' />
-                </div>
-                <div className={styles.login_parameter}>
-                    <label>Confirm Email Id</label>
-                    <input value={signupForm.confirm_email} onChange={(e) => { setSignupForm({ ...signupForm, confirm_email: e.target.value }) }} type='email' />
-                </div>
-                <div className={styles.login_parameter}>
-                    <label>Password</label>
-                    <input value={signupForm.password} onChange={(e) => { setSignupForm({ ...signupForm, password: e.target.value }) }} type='password' />
-                </div>
-                <div className={styles.login_parameter}>
-                    <label>Confirm Password</label>
-                    <input value={signupForm.confirm_password} onChange={(e) => { setSignupForm({ ...signupForm, confirm_password: e.target.value }) }} type='password' />
-                </div>
+                {field('first_name', 'First Name')}
+                {field('last_name', 'Last Name')}
+                {field('email', 'Email Id', 'email')}
+                {field('confirm_email', 'Confirm Email Id', 'email')}
+                {field('password', 'Password', 'password')}
+                {field('confirm_password', 'Confirm Password', 'password')}
 
-
-                <Button className={styles.login_button} onClick={submit_handler} loading={isLoading} variant="contained"
-                    style={{
-                        margin: '1rem 0',
-                        background: 'blue',
+                <Button
+                    className={styles.login_button}
+                    onClick={submit_handler}
+                    loading={isLoading}
+                    variant="contained"
+                    disableElevation
+                    sx={{
+                        background: '#1a2b6b',
                         borderRadius: '10px',
-                        // color: 'white',
-                        border: 'none',
-                        fontSize: '12px',
-                        padding: '8px 20px',
-                        cursor: 'pointer'
-                    }}>Submit</Button>
+                        padding: '10px 20px',
+                        '&:hover': { background: '#132056' }
+                    }}
+                >Submit</Button>
 
-
+                <div className={styles.signup_container}>
+                    <p>Already have an account? <Link href='/'>Login</Link></p>
+                </div>
             </div>
         </div >
     )

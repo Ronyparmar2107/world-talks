@@ -105,8 +105,9 @@ const init_socket = (server) => {
                 // console.log("ALl msgs done")
                 Object.entries(bySender).forEach(([senderId, updates]) => {
                     console.log(updates);
-
-                    socket.to(senderId).emit("message_status_update", ...updates)
+                    updates.forEach(update => {
+                        socket.to(senderId).emit("message_status_update", update)
+                    });
                 })
             }
             catch (err) {

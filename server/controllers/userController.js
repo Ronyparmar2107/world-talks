@@ -16,7 +16,7 @@ const auth_user = async (req, res) => {
             return res.json({ auth_user: false, error: "No user with such email." })
         }
         else {
-
+            // console.log(user, password)
             let valid_password = await bcrypt.compare(password, user.password)
             // console.log(valid_password)
 
@@ -62,6 +62,32 @@ const create_user = async (req, res) => {
     }
 }
 
+// No email verification step here on purpose - accounts use dummy/fake emails
+// during dev, so there's nowhere real to send a reset link or OTP to. This just
+// resets the password straight from the email, matched against the users
+// collection. Fine for this stage of the project, but this is NOT how a
+// forgot-password flow should work once real emails are involved - add an
+// emailed reset token/link before this ever goes anywhere near production.
+const reset_password = async (req, res) => {
+    try {
+        let { email, new_password } = req.body
+        let user = await users.findOne({ email })
+        if (!user) {
+            return res.json({ status: false, error: "No user with such email." })
+        }
+
+        const salt = await bcrypt.genSalt(10)
+        let hash_password = await bcrypt.hash(new_password, salt)
+        user.password = hash_password
+        await user.save()
+
+        return res.json({ status: true, message: "Password reset. You can log in with your new password now." })
+    } catch (error) {
+        console.log(error)
+        return res.json({ status: false, error: error })
+    }
+}
+
 const get_user = async (req, res) => {
     try {
         let user = await users.findById(req.data._id)
@@ -83,11 +109,6 @@ const get_user = async (req, res) => {
     }
 }
 
-const get_users = async (req, res) => { }
-
-const delete_user = async (req, res) => { }
-
-const update_user = async (req, res) => { }
 
 const send_request = async (req, res) => {
     try {
@@ -159,4 +180,4 @@ const manage_request = async (req, res) => {
     }
 }
 
-module.exports = { auth_user, create_user, delete_user, get_user, get_users, update_user, send_request, manage_request }
+module.exports = { auth_user, create_user, get_user, send_request, manage_request, reset_password }

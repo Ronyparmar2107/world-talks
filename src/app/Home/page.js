@@ -2,12 +2,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styles from './Home.module.css'
 import Image from 'next/image'
-import friends_list from '../../dummy_data/friends_list'
-import conversations from '@/dummy_data/conversations'
 import api from "../../api/api"
 
 import { useDispatch, useSelector } from 'react-redux'
-import { fetchUser, logoutHandler, notificationHandler, sendRequest } from '@/Redux-Toolkit/Slices/userSlice'
+import { fetchUser, logoutHandler, notificationHandler } from '@/Redux-Toolkit/Slices/userSlice'
 import {
     IconButton,
     TextField,
@@ -66,6 +64,11 @@ const Home = () => {
 
     const [messageInput, setMessageInput] = useState('')
 
+    // Right-click context menu on a message bubble ({ anchorPosition, message } or null)
+    const [messageMenu, setMessageMenu] = useState(null)
+    // The message currently shown in the "Message Info" dialog, or null when closed
+    const [messageInfo, setMessageInfo] = useState(null)
+
     const dispatch = useDispatch()
 
     useEffect(() => {
@@ -85,7 +88,7 @@ const Home = () => {
         const handleReceiveMessage = ({ conversation_id, message }) => {
             // Only append the message if its conversation is the one currently open.
             // Otherwise it belongs to a chat the user hasn't opened - ignore it here.
-            console.log("Here", conversation_id, openConversationId.current);
+            // console.log("Here", conversation_id, openConversationId.current);
 
             if (conversation_id === openConversationId.current) {
                 console.log(message)
@@ -174,7 +177,6 @@ const Home = () => {
             console.log(error)
             dispatch(notificationHandler("Something went wrong."))
         }
-        // dispatch(sendRequest(addFriend, token))
         setOpen(false)
         setAddFriendLoading(false)
     }
@@ -211,7 +213,6 @@ const Home = () => {
         // directly between two open chats.
         socket.current.emit("conversation_open", conversation_id)
         // console.log(conversation_id)
-        // setConversation(conversations.find(ele => ele.id === conversation_id))
         try {
             let response = await api.post("conversation/getconversation", {
                 conversation_id
@@ -255,6 +256,33 @@ const Home = () => {
         return friend?.name ?? ""
     }
 
+    // Right-click on a message bubble - stop the browser's own context menu and
+    // open ours instead, positioned at the click.
+    const handleMessageContextMenu = (e, message) => {
+        e.preventDefault()
+        setMessageMenu({
+            mouseX: e.clientX,
+            mouseY: e.clientY,
+            message
+        })
+    }
+
+    const closeMessageMenu = () => setMessageMenu(null)
+
+    const openMessageInfo = () => {
+        setMessageInfo(messageMenu?.message ?? null)
+        closeMessageMenu()
+    }
+
+    // received_by/seen_by already come back on every message from getconversation -
+    // no extra fetch needed. 1:1 chat only, so there's at most one entry in each,
+    // and it's always the other participant.
+    const formatTimestamp = (dateStr) => {
+        if (!dateStr) return ""
+        let d = new Date(dateStr)
+        return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+
     //Send Message
     const sendMessage = () => {
         if (!messageInput.trim()) return
@@ -275,21 +303,20 @@ const Home = () => {
 
     //Update Chat
     const updateConversation = (message) => {
+        if (!message) return
 
         setConversation(prev => {
             if (!prev?.messages) return prev
-            const alreadyExists = prev.messages.some(m => m._id === message._id)
-            // console.log(alreadyExists, prev.messages, message)
+            const cleanMessages = prev.messages.filter(Boolean)
+            const alreadyExists = cleanMessages.some(m => m._id === message._id)
+            // console.log(alreadyExists, cleanMessages, message)
             return {
                 ...prev,
                 messages: alreadyExists
-                    ? prev.messages.map(m => m._id === message._id ? message : m)
-                    : [...prev.messages, message]
+                    ? cleanMessages.map(m => m._id === message._id ? message : m)
+                    : [...cleanMessages, message]
             }
         })
-        if (message.sender !== user._id && document.hasFocus()) {
-            socket.current.emit("message_seen", { conversation_id: openConversationId.current })
-        }
     }
     return (
         <div className={styles.home_main_container}>
@@ -495,7 +522,7 @@ const Home = () => {
                                     {addDateLable(conversation?.messages, index)}
                                     {message?.sender !== user._id ?
                                         (<div className={styles.message_main_container + " " + styles.receiver_message}>
-                                            <div className={styles.message_box}>
+                                            <div className={styles.message_box} onContextMenu={(e) => handleMessageContextMenu(e, message)}>
                                                 <div className={styles.message}>{message?.message}</div>
                                                 <div className={styles.message_meta}>
                                                     <div className={styles.message_time}>{message?.time}</div>
@@ -504,7 +531,7 @@ const Home = () => {
                                             </div>
                                         </div>) :
                                         (<div className={styles.message_main_container + " " + styles.sender_message}>
-                                            <div className={styles.message_box}>
+                                            <div className={styles.message_box} onContextMenu={(e) => handleMessageContextMenu(e, message)}>
                                                 <div className={styles.message}>{message?.message}</div>
                                                 <div className={styles.message_meta}>
                                                     <div className={styles.message_time}>{message?.time}</div>
@@ -522,6 +549,7 @@ const Home = () => {
                     <input
                         type='text'
                         value={messageInput}
+                        maxLength={2000}
                         onChange={(e) => {
                             setMessageInput(e.target.value)
                             // console.error("On change")
@@ -537,6 +565,53 @@ const Home = () => {
                     <button className={styles.send_button} onClick={sendMessage}>Send</button>
                 </div>
             </div>}
+
+            {/* Right-click menu on a message bubble */}
+            <Menu
+                open={messageMenu !== null}
+                onClose={closeMessageMenu}
+                anchorReference="anchorPosition"
+                anchorPosition={
+                    messageMenu !== null
+                        ? { top: messageMenu.mouseY, left: messageMenu.mouseX }
+                        : undefined
+                }
+            >
+                <MenuItem onClick={openMessageInfo}>Message Info</MenuItem>
+            </Menu>
+
+            {/* Message Info popup */}
+            <Dialog open={messageInfo !== null} onClose={() => setMessageInfo(null)}>
+                <DialogTitle>Message Info</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic', color: 'text.secondary' }}>
+                        "{messageInfo?.message}"
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2">Sent</Typography>
+                        <Typography variant="body2">{formatTimestamp(messageInfo?.created_date)}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2">Received</Typography>
+                        <Typography variant="body2">
+                            {messageInfo?.received_by?.length > 0
+                                ? formatTimestamp(messageInfo.received_by[0].received_at)
+                                : "Not yet"}
+                        </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2">Seen</Typography>
+                        <Typography variant="body2">
+                            {messageInfo?.seen_by?.length > 0
+                                ? formatTimestamp(messageInfo.seen_by[0].seen_at)
+                                : "Not yet"}
+                        </Typography>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setMessageInfo(null)}>Close</Button>
+                </DialogActions>
+            </Dialog>
         </div >
     )
 }

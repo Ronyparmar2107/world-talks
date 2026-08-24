@@ -1,7 +1,9 @@
 .login_page {
-    background-color: #242424;
-    height: 100vh;
-    width: 100vw;
+    background: radial-gradient(circle at top, #2f2f2f 0%, #1a1a1a 65%);
+    min-height: 100vh;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 40px 16px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -10,60 +12,99 @@
 
 .login_main_container {
     height: fit-content;
-    width: fit-content;
-    padding: 2rem 5rem;
-    /* border: 2px solid black; */
-    border-radius: 15px;
-    background: #69a2ff;
-    box-shadow: 0px 0px 25px #69a2ff;
+    width: 340px;
+    padding: 2.5rem 2.5rem 2rem;
+    box-sizing: border-box;
+    border-radius: 20px;
+    background: linear-gradient(160deg, #7cadff 0%, #5f8dee 100%);
+    box-shadow: 0px 10px 40px rgba(105, 162, 255, 0.35);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
 }
 
-
 .login_main_container h1 {
-    margin-bottom: 0%;
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: 0.3px;
 }
 
 .login_main_container p {
-    margin-top: 0;
-    font-size: 12px;
+    margin-top: 4px;
+    margin-bottom: 1.25rem;
+    font-size: 13px;
+    opacity: 0.75;
 }
 
 .login_parameter {
     display: flex;
     flex-direction: column;
-    margin: 4px;
+    width: 100%;
+    margin: 8px 0;
 }
 
 .login_parameter label {
-    font-size: 13px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    opacity: 0.85;
 }
 
 .login_parameter input {
-    border-radius: 5px;
-    height: 20px;
-    border: 1px solid black;
+    box-sizing: border-box;
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1.5px solid transparent;
+    outline: none;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.92);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.login_parameter input:focus {
+    border-color: #1a2b6b;
+    box-shadow: 0 0 0 3px rgba(26, 43, 107, 0.2);
+}
+
+.login_parameter input.input_error {
+    border-color: #d32f2f;
+}
+
+.error_text {
+    min-height: 14px;
+    font-size: 11px;
+    color: #ffd7d7;
+    margin-top: 3px;
 }
 
 .login_button {
-    margin: 1rem 0;
-    background: blue;
-    border-radius: 10px;
-    color: white;
-    border: none;
-    font-size: 14px;
-    padding: 8px 20px;
-    cursor: pointer;
+    margin: 1.25rem 0 0.5rem !important;
+    width: 100%;
+    text-transform: none !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.2px !important;
 }
 
 .signup_container {
-    font-size: 10px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.signup_container p {
+    margin: 4px 0 !important;
+    opacity: 1 !important;
 }
 
 .signup_container a {
     cursor: pointer;
-    color: blue;
+    color: #1a2b6b;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.signup_container a:hover {
+    text-decoration: underline;
 }
